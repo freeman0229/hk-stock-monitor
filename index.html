@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HK Stock AI Dashboard</title>
+    <script src="https://cdn.jsdelivr.net"></script>
+    <style>
+        body { font-family: system-ui; background: #f4f7f9; margin: 0; padding: 15px; }
+        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .alert-tag { display: inline-block; padding: 5px 10px; margin: 4px; border-radius: 4px; font-size: 12px; font-weight: bold; border: 1px solid #ddd; }
+        .tag-critical { background: #fff1f0; border-color: #ffa39e; color: #cf1322; animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
+        .chart-box { height: 800px; margin-top: 20px; }
+    </style>
+</head>
+<body>
+<div class="card">
+    <h2 style="border-left: 5px solid #ff4d4f; padding-left: 10px;">港股 AI 監控看板</h2>
+    <p id="time" style="color: gray; font-size: 12px;"></p>
+    <div id="alerts"></div>
+    <div class="chart-box"><canvas id="myChart"></canvas></div>
+</div>
+
+<script>
+    const url = 'data.json'; // 讀取同目錄下的數據
+    fetch(url).then(r => r.json()).then(res => {
+        document.getElementById('time').innerText = "更新: " + res.update_time;
+        const stocks = res.stocks;
+        
+        // 顯示警報
+        const alertBox = document.getElementById('alerts');
+        stocks.forEach(s => {
+            if (s.insight !== "✅ 正常") {
+                const tag = document.createElement('div');
+                tag.className = `alert-tag ${s.inflow > 10 ? 'tag-critical' : ''}`;
+                tag.innerText = `${s.name}: ${s.insight}`;
+                alertBox.appendChild(tag);
+            }
+        });
+
+        // 繪圖
+        new Chart(document.getElementById('myChart'), {
+            type: 'bar',
+            data: {
+                labels: stocks.map(s => `${s.name} [${s.rank_change >= 0 ? '↑' : '↓'}${Math.abs(s.rank_change)}]`),
+                datasets: [
+                    { label: '淨流入(億)', data: stocks.map(s => s.inflow), backgroundColor: stocks.map(s => s.inflow > 0 ? '#ff7875' : '#95de64'), xAxisID: 'x1' },
+                    { type: 'line', label: '今日沽空%', data: stocks.map(s => s.short_today), borderColor: '#1890ff', xAxisID: 'x2' }
+                ]
+            },
+            options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false }
+        });
+    });
+</script>
+</body>
+</html>
