@@ -4,27 +4,145 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HK Stock AI Dashboard - Top 30</title>
-    <!-- 🚩 修正了 Chart.js 的引用地址 -->
-    <script src="https://cdn.jsdelivr.net"></script>
+    <!-- ✅ 修正了 Chart.js 的完整 CDN 地址 -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
-        body { font-family: -apple-system, "PingFang HK", sans-serif; background: #f4f7f9; margin: 0; padding: 15px; }
-        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); max-width: 1000px; margin: auto; }
-        .header { border-left: 5px solid #ff4d4f; padding-left: 15px; margin-bottom: 20px; }
-        .alert-tag { display: inline-block; padding: 6px 12px; margin: 4px; border-radius: 4px; font-size: 12px; font-weight: bold; border: 1px solid #ddd; background: #f9f9f9; }
-        .tag-critical { background: #fff1f0; border-color: #ffa39e; color: #cf1322; animation: pulse 1.5s infinite; }
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
-        /* 🚀 增加高度以容納 Top 30 數據 */
-        .chart-box { height: 900px; margin-top: 20px; position: relative; }
+        * { box-sizing: border-box; }
+        body { 
+            font-family: -apple-system, "PingFang HK", "Microsoft YaHei", sans-serif; 
+            background: linear-gradient(135deg, #f4f7f9 0%, #e8eef2 100%);
+            margin: 0; 
+            padding: 15px; 
+        }
+        .card { 
+            background: white; 
+            padding: 20px; 
+            border-radius: 12px; 
+            box-shadow: 0 4px 20px rgba(0,0,0,0.12); 
+            max-width: 1200px; 
+            margin: auto; 
+        }
+        .header { 
+            border-left: 5px solid #ff4d4f; 
+            padding-left: 15px; 
+            margin-bottom: 20px; 
+        }
+        .header h2 {
+            margin: 0;
+            color: #262626;
+            font-size: 24px;
+        }
+        .header p {
+            color: #8c8c8c;
+            font-size: 13px;
+            margin: 5px 0 0 0;
+        }
+        
+        /* 警報標籤樣式 */
+        #alerts {
+            margin-bottom: 20px;
+            min-height: 30px;
+        }
+        .alert-tag { 
+            display: inline-block; 
+            padding: 8px 14px; 
+            margin: 4px; 
+            border-radius: 6px; 
+            font-size: 13px; 
+            font-weight: 600; 
+            border: 1px solid #ddd; 
+            background: #f9f9f9;
+            transition: all 0.3s ease;
+        }
+        .alert-tag:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .tag-critical { 
+            background: #fff1f0; 
+            border-color: #ffa39e; 
+            color: #cf1322; 
+            animation: pulse 1.5s infinite; 
+        }
+        .tag-warning {
+            background: #fff7e6;
+            border-color: #ffd591;
+            color: #d46b08;
+        }
+        @keyframes pulse { 
+            0% { opacity: 1; transform: scale(1); } 
+            50% { opacity: 0.85; transform: scale(1.02); } 
+            100% { opacity: 1; transform: scale(1); } 
+        }
+        
+        /* 圖表容器 - 增加高度以容納 Top 30 */
+        .chart-box { 
+            height: 950px; 
+            margin-top: 20px; 
+            position: relative; 
+            padding: 10px;
+            background: #fafafa;
+            border-radius: 8px;
+        }
+        
+        /* 載入動畫 */
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #8c8c8c;
+        }
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #1890ff;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* 錯誤提示 */
+        .error-msg {
+            background: #fff2f0;
+            border: 1px solid #ffccc7;
+            color: #cf1322;
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 20px;
+            font-size: 14px;
+        }
+        
+        /* 響應式設計 */
+        @media (max-width: 768px) {
+            .card {
+                padding: 15px;
+            }
+            .chart-box {
+                height: 1200px;
+            }
+            .header h2 {
+                font-size: 20px;
+            }
+        }
     </style>
 </head>
 <body>
 <div class="card">
     <div class="header">
-        <h2 style="margin:0;">港股 AI 資金監控看板 (Top 30)</h2>
-        <p id="time" style="color: gray; font-size: 12px; margin: 5px 0 0 0;"></p>
+        <h2>📊 港股 AI 資金監控看板 (Top 30)</h2>
+        <p id="time">正在載入數據...</p>
     </div>
     
-    <div id="alerts"></div>
+    <div id="alerts">
+        <div class="loading">
+            <div class="spinner"></div>
+            <p>數據載入中...</p>
+        </div>
+    </div>
     
     <div class="chart-box">
         <canvas id="myChart"></canvas>
@@ -32,94 +150,241 @@
 </div>
 
 <script>
-    const url = 'data.json';
+    const DATA_URL = 'data.json';
     
-    fetch(url)
-    .then(r => {
-        if (!r.ok) throw new Error("數據載入中或檔案不存在...");
-        return r.json();
-    })
-    .then(res => {
-        const stocks = res.stocks;
-        document.getElementById('time').innerText = "最後更新: " + res.update_time;
-        
-        // 🚩 數據檢查：如果數據全是 0，給予提示
-        const isAllZero = stocks.every(s => s.inflow === 0);
-        if (isAllZero) {
-            document.getElementById('time').innerHTML += " <br><b style='color:orange;'>⚠️ 今日數據源尚未發布，圖表暫為預覽狀態</b>";
-        }
-
-        // 顯示異動警報
-        const alertBox = document.getElementById('alerts');
-        stocks.forEach(s => {
-            if (s.insight !== "✅ 正常") {
-                const tag = document.createElement('div');
-                // 淨流入 > 10 億則觸發閃爍
-                tag.className = `alert-tag ${s.inflow > 10 ? 'tag-critical' : ''}`;
-                tag.innerText = `${s.name}: ${s.insight}`;
-                alertBox.appendChild(tag);
+    // 載入並渲染數據
+    async function loadData() {
+        try {
+            const response = await fetch(DATA_URL);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: 無法載入數據檔案`);
             }
+            
+            const data = await response.json();
+            
+            // 驗證數據結構
+            if (!data.stocks || !Array.isArray(data.stocks)) {
+                throw new Error('數據格式錯誤: 缺少 stocks 陣列');
+            }
+            
+            renderDashboard(data);
+            
+        } catch (error) {
+            console.error('載入數據失敗:', error);
+            showError(error.message);
+        }
+    }
+    
+    // 渲染儀表板
+    function renderDashboard(data) {
+        const stocks = data.stocks;
+        const updateTime = data.update_time || '未知';
+        
+        // 更新時間顯示
+        const timeElement = document.getElementById('time');
+        timeElement.innerText = `最後更新: ${updateTime}`;
+        
+        // 檢查數據是否全為零 (可能是數據源尚未更新)
+        const isAllZero = stocks.every(s => s.inflow === 0 && s.short_today === 0);
+        if (isAllZero) {
+            timeElement.innerHTML += " <br><b style='color: #fa8c16;'>⚠️ 數據源尚未發布，圖表暫為預覽狀態</b>";
+        }
+        
+        // 渲染警報標籤
+        renderAlerts(stocks);
+        
+        // 渲染圖表
+        renderChart(stocks);
+    }
+    
+    // 渲染警報區域
+    function renderAlerts(stocks) {
+        const alertBox = document.getElementById('alerts');
+        alertBox.innerHTML = ''; // 清空載入動畫
+        
+        const alerts = stocks.filter(s => s.insight !== "✅ 正常");
+        
+        if (alerts.length === 0) {
+            alertBox.innerHTML = '<p style="color: #52c41a; font-size: 14px;">✅ 目前無重大異動</p>';
+            return;
+        }
+        
+        alerts.forEach(stock => {
+            const tag = document.createElement('div');
+            
+            // 根據淨流入大小決定樣式
+            if (stock.inflow > 10) {
+                tag.className = 'alert-tag tag-critical';
+            } else if (stock.inflow > 5 || stock.insight.includes('空頭平倉')) {
+                tag.className = 'alert-tag tag-warning';
+            } else {
+                tag.className = 'alert-tag';
+            }
+            
+            tag.innerText = `${stock.name} (${stock.code}): ${stock.insight} | 淨流入: ${stock.inflow}億`;
+            alertBox.appendChild(tag);
         });
-
-        // 繪製橫向 Top 30 圖表
+    }
+    
+    // 渲染圖表
+    function renderChart(stocks) {
         const ctx = document.getElementById('myChart').getContext('2d');
+        
+        // 準備標籤 (加入排名變動)
+        const labels = stocks.map(stock => {
+            let changeSymbol = '─';
+            if (stock.rank_change > 0) {
+                changeSymbol = `↑${stock.rank_change}`;
+            } else if (stock.rank_change < 0) {
+                changeSymbol = `↓${Math.abs(stock.rank_change)}`;
+            }
+            return `${stock.name} [${changeSymbol}]`;
+        });
+        
+        // 準備數據集
+        const inflowData = stocks.map(s => s.inflow);
+        const shortData = stocks.map(s => s.short_today);
+        
+        // 動態設定 X 軸範圍
+        const maxInflow = Math.max(...inflowData.map(Math.abs));
+        const maxShort = Math.max(...shortData);
+        
         new Chart(ctx, {
             type: 'bar',
             data: {
-                // 標籤加入排名變動符號
-                labels: stocks.map(s => {
-                    const change = s.rank_change > 0 ? `↑${s.rank_change}` : (s.rank_change < 0 ? `↓${Math.abs(s.rank_change)}` : '─');
-                    return `${s.name} [${change}]`;
-                }),
+                labels: labels,
                 datasets: [
                     {
-                        label: '淨流入 (億)',
-                        data: stocks.map(s => s.inflow),
-                        backgroundColor: stocks.map(s => s.inflow > 0 ? '#ff7875' : '#95de64'),
+                        label: '南向資金淨流入 (億港元)',
+                        data: inflowData,
+                        backgroundColor: inflowData.map(val => 
+                            val > 10 ? '#ff4d4f' :  // 大額流入 - 紅色
+                            val > 0 ? '#ff7875' :   // 流入 - 淺紅
+                            val < -5 ? '#52c41a' :  // 大額流出 - 綠色
+                            '#95de64'               // 流出 - 淺綠
+                        ),
+                        borderColor: inflowData.map(val => 
+                            val > 0 ? '#cf1322' : '#237804'
+                        ),
+                        borderWidth: 1,
                         xAxisID: 'x1',
-                        barThickness: 15
+                        barThickness: 14
                     },
                     {
                         type: 'line',
-                        label: '今日沽空 %',
-                        data: stocks.map(s => s.short_today),
+                        label: '當日沽空比率 (%)',
+                        data: shortData,
                         borderColor: '#1890ff',
+                        backgroundColor: 'rgba(24, 144, 255, 0.1)',
                         borderWidth: 2,
-                        pointRadius: 3,
-                        xAxisID: 'x2'
+                        pointRadius: 4,
+                        pointBackgroundColor: '#1890ff',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2,
+                        xAxisID: 'x2',
+                        tension: 0.3
                     }
                 ]
             },
             options: {
-                indexAxis: 'y', // 🚀 設為橫向
+                indexAxis: 'y', // 橫向圖表
                 responsive: true,
                 maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false
+                },
                 scales: {
                     x1: { 
                         position: 'bottom', 
-                        title: { display: true, text: '金額 (億港元)' },
-                        suggestedMin: -5, 
-                        suggestedMax: 5 
+                        title: { 
+                            display: true, 
+                            text: '南向資金淨流入 (億港元)',
+                            font: { size: 14, weight: 'bold' }
+                        },
+                        suggestedMin: Math.min(-5, -maxInflow - 2), 
+                        suggestedMax: Math.max(15, maxInflow + 2),
+                        grid: {
+                            color: 'rgba(0, 0, 0, 0.05)'
+                        }
                     },
                     x2: { 
                         position: 'top', 
-                        title: { display: true, text: '沽空比率 (%)' },
-                        suggestedMax: 60,
-                        grid: { drawOnChartArea: false }
+                        title: { 
+                            display: true, 
+                            text: '當日沽空比率 (%)',
+                            font: { size: 14, weight: 'bold' }
+                        },
+                        suggestedMin: 0,
+                        suggestedMax: Math.max(60, maxShort + 5),
+                        grid: { 
+                            drawOnChartArea: false,
+                            color: 'rgba(24, 144, 255, 0.1)'
+                        }
+                    },
+                    y: {
+                        ticks: {
+                            font: { size: 11 },
+                            color: '#595959'
+                        }
                     }
                 },
                 plugins: {
-                    legend: { position: 'bottom' }
+                    legend: { 
+                        position: 'bottom',
+                        labels: {
+                            font: { size: 13 },
+                            padding: 15,
+                            usePointStyle: true
+                        }
+                    },
+                    tooltip: {
+                        enabled: true,
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        padding: 12,
+                        titleFont: { size: 14 },
+                        bodyFont: { size: 13 },
+                        callbacks: {
+                            label: function(context) {
+                                const label = context.dataset.label || '';
+                                const value = context.parsed.x;
+                                if (context.datasetIndex === 0) {
+                                    return `${label}: ${value.toFixed(2)} 億`;
+                                } else {
+                                    return `${label}: ${value.toFixed(2)}%`;
+                                }
+                            }
+                        }
+                    }
                 }
             }
         });
-    })
-    .catch(err => {
-        document.getElementById('time').innerText = "❌ " + err.message;
-    });
+    }
+    
+    // 顯示錯誤訊息
+    function showError(message) {
+        const timeElement = document.getElementById('time');
+        timeElement.innerHTML = `❌ 載入失敗: ${message}`;
+        
+        const alertBox = document.getElementById('alerts');
+        alertBox.innerHTML = `
+            <div class="error-msg">
+                <strong>⚠️ 無法載入數據</strong><br>
+                ${message}<br>
+                <small>請確認 data.json 檔案存在且格式正確</small>
+            </div>
+        `;
+        
+        // 隱藏圖表區域
+        document.querySelector('.chart-box').style.display = 'none';
+    }
+    
+    // 頁面載入時執行
+    loadData();
+    
+    // 可選: 每 5 分鐘自動重新載入數據
+    // setInterval(loadData, 5 * 60 * 1000);
 </script>
 </body>
 </html>
-
-
-
