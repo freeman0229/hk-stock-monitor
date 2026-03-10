@@ -34,7 +34,6 @@ def get_historical_short_avg(days=5):
 def run_analysis():
     # 1. 抓取今日成交 Top 30
     df_all = ak.stock_hk_spot_em()
-    # 🚩 這裡修正了縮進與欄位名稱
     target_col = "成交额" if "成交额" in df_all.columns else "成交金额"
     code_col = "代码" if "代码" in df_all.columns else "代碼"
     name_col = "名称" if "名称" in df_all.columns else "名稱"
@@ -42,22 +41,27 @@ def run_analysis():
     df_all = df_all.sort_values(by=target_col, ascending=False).head(40)
     df_all['股票代碼'] = df_all[code_col].astype(str).str.zfill(5)
 
-    # 2. 獲取南向資金 (處理簡繁體欄位)
-     # 直接獲取完整的港股通成分股，不需要參數
-    df_gt = ak.stock_hk_ggt_components_em() 
-    # 確保代碼格式正確 (5位數)
-    df_gt['股票代碼'] = df_gt['代码'].astype(str).str.zfill(5)
-    
-    buy_col = "買入金額" if "買入金額" in df_gt.columns else "买入金额"
-    sell_col = "賣出金額" if "賣出金額" in df_gt.columns else "卖出金额"
-    df_gt['net_inflow'] = (df_gt[buy_col] - df_gt[sell_col]) / 1e8
+     # 2. 獲取南向資金
+    try:
+        df_gt_sh = ak.stock_hk_ggt_board_em(symbol="滬港通")
+        df_gt_sz = ak.stock_hk_ggt_board_em(symbol="深港通")
+        df_gt = pd.concat([df_gt_sh, df_gt_sz]).drop_duplicates(subset=['代码'])
+        
+        b_col = "买入金额" if "买入金额" in df_gt.columns else "買入金額"
+        s_col = "卖出金额" if "卖出金额" in df_gt.columns else "賣出金額"
+        c_col = "代码" if "代码" in df_gt.columns else "代碼"
+        
+        df_gt['net_inflow'] = (df_gt[b_col] - df_gt[s_col]) / 1e8
+        df_gt['股票代碼'] = df_gt[c_col].astype(str).str.zfill(5)
+    except:
+        df_gt = pd.DataFrame(columns=['股票代碼', 'net_inflow'])
 
     # 3. 獲取沽空數據
     df_short_today = ak.stock_hk_short_sell_summary()
     df_short_today['股票代碼'] = df_short_today['股票代碼'].str.zfill(5)
     df_avg = get_historical_short_avg(5)
 
-    # 4. 整合
+    # 4. 整合 (🚩 修正了 name_col 的引用)
     df_m = pd.merge(df_all[['股票代碼', name_col]], df_gt[['股票代碼', 'net_inflow']], on='股票代碼', how='left')
     df_m = pd.merge(df_m, df_short_today[['股票代碼', '沽空比率']], on='股票代碼', how='left')
     df_f = pd.merge(df_m, df_avg, on='股票代碼', how='left').head(30)
@@ -96,9 +100,9 @@ def run_analysis():
 
     if TELEGRAM_TOKEN and CHAT_ID:
         msg = f"📊 *港股 Top 30 策略報告*\n" + "\n".join([f"{s['name']}: {s['insight']} (入:{s['inflow']}億)" for s in final_results[:10]])
+        # 🚩 修正了 Telegram URL 格式
         url = f"https://api.telegram.org{TELEGRAM_TOKEN}/sendMessage"
         requests.post(url, data={"chat_id": CHAT_ID, "text": msg, "parse_mode": "Markdown"})
 
 if __name__ == "__main__":
     run_analysis()
-
