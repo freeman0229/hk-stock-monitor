@@ -2,16 +2,16 @@ name: Daily Sync
 on:
   schedule:
     - cron: '40 9 * * 1-5' # 香港時間 17:40
-  workflow_dispatch:
+  workflow_dispatch: # 允許手動點擊執行
 jobs:
   run:
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4 # 🚀 從 v3 升級到 v4
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5 # 🚀 從 v4 升級到 v5
         with:
           python-version: '3.9'
       - run: pip install -r requirements.txt
@@ -25,5 +25,5 @@ jobs:
           git config --global user.name "Bot"
           git config --global user.email "bot@github.com"
           git add data.json
-          git commit -m "Update Data" || exit 0
+          git commit -m "Update Data: $(date)" || exit 0
           git push
