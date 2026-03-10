@@ -34,16 +34,22 @@ def get_historical_short_avg(days=5):
 def run_analysis():
     # 1. 抓取今日成交 Top 30
     df_all = ak.stock_hk_spot_em()
-# 自動識別是 "成交额" 還是 "成交金额"
-target_col = "成交额" if "成交额" in df_all.columns else "成交金额"
-df_all = df_all.sort_values(by=target_col, ascending=False).head(40)
-    df_all['股票代碼'] = df_all['代碼'].str.zfill(5)
+    # 🚩 這裡修正了縮進與欄位名稱
+    target_col = "成交额" if "成交额" in df_all.columns else "成交金额"
+    code_col = "代码" if "代码" in df_all.columns else "代碼"
+    name_col = "名称" if "名称" in df_all.columns else "名稱"
+    
+    df_all = df_all.sort_values(by=target_col, ascending=False).head(40)
+    df_all['股票代碼'] = df_all[code_col].astype(str).str.zfill(5)
 
-    # 2. 獲取南向資金
+    # 2. 獲取南向資金 (處理簡繁體欄位)
     df_sh = ak.stock_hk_ggt_components_em(symbol="滬港通")
     df_sz = ak.stock_hk_ggt_components_em(symbol="深港通")
     df_gt = pd.concat([df_sh, df_sz]).drop_duplicates(subset=['股票代碼'])
-    df_gt['net_inflow'] = (df_gt['買入金額'] - df_gt['賣出金額']) / 1e8
+    
+    buy_col = "買入金額" if "買入金額" in df_gt.columns else "买入金额"
+    sell_col = "賣出金額" if "賣出金額" in df_gt.columns else "卖出金额"
+    df_gt['net_inflow'] = (df_gt[buy_col] - df_gt[sell_col]) / 1e8
 
     # 3. 獲取沽空數據
     df_short_today = ak.stock_hk_short_sell_summary()
@@ -51,11 +57,11 @@ df_all = df_all.sort_values(by=target_col, ascending=False).head(40)
     df_avg = get_historical_short_avg(5)
 
     # 4. 整合
-    df_m = pd.merge(df_all[['股票代碼', '名稱']], df_gt[['股票代碼', 'net_inflow']], on='股票代碼', how='left')
+    df_m = pd.merge(df_all[['股票代碼', name_col]], df_gt[['股票代碼', 'net_inflow']], on='股票代碼', how='left')
     df_m = pd.merge(df_m, df_short_today[['股票代碼', '沽空比率']], on='股票代碼', how='left')
     df_f = pd.merge(df_m, df_avg, on='股票代碼', how='left').head(30)
 
-    # 5. 排名變動邏輯 (讀取舊排名)
+    # 5. 排名變動邏輯
     old_ranks = {}
     if os.path.exists('data.json'):
         try:
@@ -66,12 +72,11 @@ df_all = df_all.sort_values(by=target_col, ascending=False).head(40)
 
     final_results = []
     for i, (_, row) in enumerate(df_f.iterrows()):
-        code, name = row['股票代碼'], row['名稱']
+        code, name = row['股票代碼'], row[name_col]
         inflow = row['net_inflow'] if not pd.isna(row['net_inflow']) else 0
         curr_s = row['沽空比率'] if not pd.isna(row['沽空比率']) else 0
         avg_s = row['avg_short_ratio'] if not pd.isna(row['avg_short_ratio']) else curr_s
         
-        # 診斷標籤
         insight = "✅ 正常"
         if curr_s < (avg_s * 0.7) and inflow > 2: insight = "⚠️ 空頭平倉"
         elif curr_s > (avg_s * 1.4): insight = "⚡ 沽空激增"
@@ -84,14 +89,15 @@ df_all = df_all.sort_values(by=target_col, ascending=False).head(40)
             "rank_change": old_ranks.get(code, i) - i
         })
 
-    # 儲存與發送
     output = {"update_time": datetime.datetime.now().strftime('%Y-%m-%d %H:%M'), "stocks": final_results}
     with open('data.json', 'w', encoding='utf-8') as f:
         json.dump(output, f, ensure_ascii=False, indent=4)
 
-    if TELEGRAM_TOKEN:
+    if TELEGRAM_TOKEN and CHAT_ID:
         msg = f"📊 *港股 Top 30 策略報告*\n" + "\n".join([f"{s['name']}: {s['insight']} (入:{s['inflow']}億)" for s in final_results[:10]])
-        requests.post(f"https://api.telegram.org{TELEGRAM_TOKEN}/sendMessage", data={"chat_id": CHAT_ID, "text": msg, "parse_mode": "Markdown"})
+        url = f"https://api.telegram.org{TELEGRAM_TOKEN}/sendMessage"
+        requests.post(url, data={"chat_id": CHAT_ID, "text": msg, "parse_mode": "Markdown"})
 
 if __name__ == "__main__":
     run_analysis()
+
