@@ -34,7 +34,9 @@ def get_historical_short_avg(days=5):
 def run_analysis():
     # 1. 抓取今日成交 Top 30
     df_all = ak.stock_hk_spot_em()
-    df_all = df_all.sort_values(by="成交額", ascending=False).head(40)
+# 自動識別是 "成交额" 還是 "成交金额"
+target_col = "成交额" if "成交额" in df_all.columns else "成交金额"
+df_all = df_all.sort_values(by=target_col, ascending=False).head(40)
     df_all['股票代碼'] = df_all['代碼'].str.zfill(5)
 
     # 2. 獲取南向資金
