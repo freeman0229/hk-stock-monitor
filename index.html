@@ -3,55 +3,123 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HK Stock AI Dashboard</title>
+    <title>HK Stock AI Dashboard - Top 30</title>
+    <!-- 🚩 修正了 Chart.js 的引用地址 -->
     <script src="https://cdn.jsdelivr.net"></script>
     <style>
-        body { font-family: system-ui; background: #f4f7f9; margin: 0; padding: 15px; }
-        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-        .alert-tag { display: inline-block; padding: 5px 10px; margin: 4px; border-radius: 4px; font-size: 12px; font-weight: bold; border: 1px solid #ddd; }
+        body { font-family: -apple-system, "PingFang HK", sans-serif; background: #f4f7f9; margin: 0; padding: 15px; }
+        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); max-width: 1000px; margin: auto; }
+        .header { border-left: 5px solid #ff4d4f; padding-left: 15px; margin-bottom: 20px; }
+        .alert-tag { display: inline-block; padding: 6px 12px; margin: 4px; border-radius: 4px; font-size: 12px; font-weight: bold; border: 1px solid #ddd; background: #f9f9f9; }
         .tag-critical { background: #fff1f0; border-color: #ffa39e; color: #cf1322; animation: pulse 1.5s infinite; }
         @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
-        .chart-box { height: 800px; margin-top: 20px; }
+        /* 🚀 增加高度以容納 Top 30 數據 */
+        .chart-box { height: 900px; margin-top: 20px; position: relative; }
     </style>
 </head>
 <body>
 <div class="card">
-    <h2 style="border-left: 5px solid #ff4d4f; padding-left: 10px;">港股 AI 監控看板</h2>
-    <p id="time" style="color: gray; font-size: 12px;"></p>
+    <div class="header">
+        <h2 style="margin:0;">港股 AI 資金監控看板 (Top 30)</h2>
+        <p id="time" style="color: gray; font-size: 12px; margin: 5px 0 0 0;"></p>
+    </div>
+    
     <div id="alerts"></div>
-    <div class="chart-box"><canvas id="myChart"></canvas></div>
+    
+    <div class="chart-box">
+        <canvas id="myChart"></canvas>
+    </div>
 </div>
 
 <script>
-    const url = 'data.json'; // 讀取同目錄下的數據
-    fetch(url).then(r => r.json()).then(res => {
-        document.getElementById('time').innerText = "更新: " + res.update_time;
+    const url = 'data.json';
+    
+    fetch(url)
+    .then(r => {
+        if (!r.ok) throw new Error("數據載入中或檔案不存在...");
+        return r.json();
+    })
+    .then(res => {
         const stocks = res.stocks;
+        document.getElementById('time').innerText = "最後更新: " + res.update_time;
         
-        // 顯示警報
+        // 🚩 數據檢查：如果數據全是 0，給予提示
+        const isAllZero = stocks.every(s => s.inflow === 0);
+        if (isAllZero) {
+            document.getElementById('time').innerHTML += " <br><b style='color:orange;'>⚠️ 今日數據源尚未發布，圖表暫為預覽狀態</b>";
+        }
+
+        // 顯示異動警報
         const alertBox = document.getElementById('alerts');
         stocks.forEach(s => {
             if (s.insight !== "✅ 正常") {
                 const tag = document.createElement('div');
+                // 淨流入 > 10 億則觸發閃爍
                 tag.className = `alert-tag ${s.inflow > 10 ? 'tag-critical' : ''}`;
                 tag.innerText = `${s.name}: ${s.insight}`;
                 alertBox.appendChild(tag);
             }
         });
 
-        // 繪圖
-        new Chart(document.getElementById('myChart'), {
+        // 繪製橫向 Top 30 圖表
+        const ctx = document.getElementById('myChart').getContext('2d');
+        new Chart(ctx, {
             type: 'bar',
             data: {
-                labels: stocks.map(s => `${s.name} [${s.rank_change >= 0 ? '↑' : '↓'}${Math.abs(s.rank_change)}]`),
+                // 標籤加入排名變動符號
+                labels: stocks.map(s => {
+                    const change = s.rank_change > 0 ? `↑${s.rank_change}` : (s.rank_change < 0 ? `↓${Math.abs(s.rank_change)}` : '─');
+                    return `${s.name} [${change}]`;
+                }),
                 datasets: [
-                    { label: '淨流入(億)', data: stocks.map(s => s.inflow), backgroundColor: stocks.map(s => s.inflow > 0 ? '#ff7875' : '#95de64'), xAxisID: 'x1' },
-                    { type: 'line', label: '今日沽空%', data: stocks.map(s => s.short_today), borderColor: '#1890ff', xAxisID: 'x2' }
+                    {
+                        label: '淨流入 (億)',
+                        data: stocks.map(s => s.inflow),
+                        backgroundColor: stocks.map(s => s.inflow > 0 ? '#ff7875' : '#95de64'),
+                        xAxisID: 'x1',
+                        barThickness: 15
+                    },
+                    {
+                        type: 'line',
+                        label: '今日沽空 %',
+                        data: stocks.map(s => s.short_today),
+                        borderColor: '#1890ff',
+                        borderWidth: 2,
+                        pointRadius: 3,
+                        xAxisID: 'x2'
+                    }
                 ]
             },
-            options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false }
+            options: {
+                indexAxis: 'y', // 🚀 設為橫向
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x1: { 
+                        position: 'bottom', 
+                        title: { display: true, text: '金額 (億港元)' },
+                        suggestedMin: -5, 
+                        suggestedMax: 5 
+                    },
+                    x2: { 
+                        position: 'top', 
+                        title: { display: true, text: '沽空比率 (%)' },
+                        suggestedMax: 60,
+                        grid: { drawOnChartArea: false }
+                    }
+                },
+                plugins: {
+                    legend: { position: 'bottom' }
+                }
+            }
         });
+    })
+    .catch(err => {
+        document.getElementById('time').innerText = "❌ " + err.message;
     });
 </script>
 </body>
 </html>
+
+
+
