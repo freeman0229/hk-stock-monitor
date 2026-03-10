@@ -6,19 +6,18 @@ import os
 import datetime
 import time
 
-# 配置 GitHub Secrets
-TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
-CHAT_ID = os.getenv('CHAT_ID')
+# 配置 GitHub Secrets (從環境變量讀取)
+TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN', '').strip()
+CHAT_ID = os.getenv('CHAT_ID', '').strip()
 
 def get_historical_short_avg(days=5):
-    """獲取過去5個交易日的平均沽空率 (使用最新接口名)"""
+    """獲取過去5個交易日的平均沽空率"""
     short_histories = []
     target_date = datetime.datetime.now() - datetime.timedelta(days=1)
     attempts = 0
     while len(short_histories) < days and attempts < 12:
         date_str = target_date.strftime('%Y%m%d')
         try:
-            # 抓取歷史沽空報告
             df = ak.stock_hksell_summary(date=date_str)
             if not df.empty:
                 df['股票代碼'] = df['股票代碼'].str.zfill(5)
@@ -45,7 +44,7 @@ def run_analysis():
     df_all = df_all.sort_values(by=target_col, ascending=False).head(40)
     df_all['股票代碼'] = df_all[code_col].astype(str).str.zfill(5)
 
-    # 2. 獲取南向資金 (活躍股接口)
+    # 2. 獲取南向資金
     try:
         df_gt_sh = ak.stock_hk_ggt_board_em(symbol="滬港通")
         df_gt_sz = ak.stock_hk_ggt_board_em(symbol="深港通")
@@ -69,17 +68,14 @@ def run_analysis():
         
     df_avg = get_historical_short_avg(5)
 
-    # 4. 數據大整合 (加入安全檢查防止 KeyError)
-    # 先合併成交额與南向資金
+    # 4. 數據整合 (安全檢查)
     df_m = pd.merge(df_all[['股票代碼', name_col]], df_gt[['股票代碼', 'net_inflow']], on='股票代碼', how='left')
     
-    # 合併今日沽空
     if not df_short_today.empty:
         df_m = pd.merge(df_m, df_short_today[['股票代碼', '沽空比率']], on='股票代碼', how='left')
     else:
         df_m['沽空比率'] = None
 
-    # 合併 5 日平均沽空 (🚩 核心修正點：確保 df_avg 包含必要欄位)
     if not df_avg.empty and '股票代碼' in df_avg.columns:
         df_f = pd.merge(df_m, df_avg, on='股票代碼', how='left').head(30)
     else:
@@ -87,7 +83,7 @@ def run_analysis():
         df_f['avg_short_ratio'] = None
         df_f = df_f.head(30)
 
-    # 5. 排名變動邏輯 (讀取昨日排名)
+    # 5. 排名變動邏輯
     old_ranks = {}
     if os.path.exists('data.json'):
         try:
@@ -105,11 +101,9 @@ def run_analysis():
         avg_s = row['avg_short_ratio'] if not pd.isna(row['avg_short_ratio']) else curr_s
         
         insight = "✅ 正常"
-        # 只有在有平均值參考時才進行動態判斷
         if avg_s and avg_s > 0:
             if curr_s < (avg_s * 0.75) and inflow > 1.5: insight = "⚠️ 空頭平倉"
             elif curr_s > (avg_s * 1.4): insight = "⚡ 沽空激增"
-        
         if inflow > 10: insight = "🔥 主力掃貨"
 
         final_results.append({
@@ -120,16 +114,26 @@ def run_analysis():
             "rank_change": old_ranks.get(code, i) - i
         })
 
-    # 6. 儲存 JSON (供網頁讀取)
+    # 6. 儲存 JSON (🚩 確保這一步先於 Telegram 執行)
     output = {"update_time": datetime.datetime.now().strftime('%Y-%m-%d %H:%M'), "stocks": final_results}
     with open('data.json', 'w', encoding='utf-8') as f:
         json.dump(output, f, ensure_ascii=False, indent=4)
+    print("✅ data.json 更新成功！")
 
-    # 7. Telegram 推送
+    # 7. Telegram 推送 (🚩 加入 URL 安全檢查)
     if TELEGRAM_TOKEN and CHAT_ID:
-        msg = f"📊 *港股 Top 30 策略報告*\n" + "\n".join([f"{s['name']}: {s['insight']} (入:{s['inflow']}億)" for s in final_results[:12]])
-        url = f"https://api.telegram.org{TELEGRAM_TOKEN}/sendMessage"
-        requests.post(url, data={"chat_id": CHAT_ID, "text": msg, "parse_mode": "Markdown"})
+        try:
+            # 安全構建 URL，移除多餘空格與 bot 前綴檢查
+            token = TELEGRAM_TOKEN.replace('bot', '') 
+            url = f"https://api.telegram.org{token}/sendMessage"
+            
+            msg = f"📊 *港股 Top 30 策略報告*\n" + "\n".join([f"{s['name']}: {s['insight']} (入:{s['inflow']}億)" for s in final_results[:12]])
+            res = requests.post(url, data={"chat_id": CHAT_ID, "text": msg, "parse_mode": "Markdown"}, timeout=10)
+            print(f"Telegram 推送狀態碼: {res.status_code}")
+        except Exception as e:
+            print(f"⚠️ Telegram 推送失敗，但不影響數據儲存: {e}")
+    else:
+        print("ℹ️ 跳過 Telegram 推送 (Token 或 ID 為空)")
 
 if __name__ == "__main__":
     run_analysis()
