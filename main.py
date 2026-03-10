@@ -43,9 +43,10 @@ def run_analysis():
     df_all['股票代碼'] = df_all[code_col].astype(str).str.zfill(5)
 
     # 2. 獲取南向資金 (處理簡繁體欄位)
-    df_sh = ak.stock_hk_ggt_components_em(select="滬港通")
-    df_sz = ak.stock_hk_ggt_components_em(select="深港通")
-    df_gt = pd.concat([df_sh, df_sz]).drop_duplicates(subset=['股票代碼'])
+     # 直接獲取完整的港股通成分股，不需要參數
+    df_gt = ak.stock_hk_ggt_components_em() 
+    # 確保代碼格式正確 (5位數)
+    df_gt['股票代碼'] = df_gt['代码'].astype(str).str.zfill(5)
     
     buy_col = "買入金額" if "買入金額" in df_gt.columns else "买入金额"
     sell_col = "賣出金額" if "賣出金額" in df_gt.columns else "卖出金额"
