@@ -1,13 +1,16 @@
 <!DOCTYPE html>
 <html>
 <head>
+
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
 <title>HK Stock AI Dashboard - Top 30</title>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
 <style>
+
 *{box-sizing:border-box}
 
 body{
@@ -132,6 +135,7 @@ font-size:14px;
 .header h2{font-size:20px}
 
 }
+
 </style>
 </head>
 
@@ -145,10 +149,12 @@ font-size:14px;
 </div>
 
 <div id="alerts">
+
 <div class="loading">
 <div class="spinner"></div>
 <p>數據載入中...</p>
 </div>
+
 </div>
 
 <div class="chart-box">
@@ -159,31 +165,32 @@ font-size:14px;
 
 <script>
 
-const DATA_URL = "data.json";
-let myChart = null;
+const DATA_URL = "data.json"
+let myChart = null
 
 async function loadData(){
 
 try{
 
-const response = await fetch(DATA_URL + "?t=" + Date.now());
+const response = await fetch(DATA_URL + "?t=" + Date.now())
 
 if(!response.ok){
-throw new Error(`HTTP ${response.status}`);
+throw new Error("HTTP " + response.status)
 }
 
-const data = await response.json();
+const data = await response.json()
 
 if(!data.stocks || !Array.isArray(data.stocks)){
-throw new Error("數據格式錯誤");
+throw new Error("數據格式錯誤")
 }
 
-renderDashboard(data);
+renderDashboard(data)
 
 }catch(error){
 
-console.error("載入失敗",error);
-showError(error.message);
+console.error("Data load failed:",error)
+
+showError(error.message)
 
 }
 
@@ -191,95 +198,113 @@ showError(error.message);
 
 function renderDashboard(data){
 
-const stocks = data.stocks || [];
-const updateTime = data.update_time || "未知";
+const stocks = data.stocks || []
+const updateTime = data.update_time || "未知"
 
-const timeElement = document.getElementById("time");
+const timeElement = document.getElementById("time")
 
-timeElement.innerText = `最後更新: ${updateTime}`;
+timeElement.innerText = "最後更新: " + updateTime
 
-const isAllZero = stocks.every(s => s.inflow===0 && s.short_today===0);
+if(stocks.length === 0){
 
-if(isAllZero){
-
-timeElement.innerHTML += "<br><b style='color:#fa8c16'>⚠️ 數據源尚未發布</b>";
+showError("沒有可顯示的股票數據")
+return
 
 }
 
-renderAlerts(stocks);
+const isAllZero = stocks.every(s =>
+Number(s.inflow) === 0 && Number(s.short_today) === 0
+)
 
-renderChart(stocks);
+if(isAllZero){
+
+timeElement.innerHTML +=
+"<br><b style='color:#fa8c16'>⚠️ 數據源尚未發布</b>"
+
+}
+
+renderAlerts(stocks)
+
+renderChart(stocks)
 
 }
 
 function renderAlerts(stocks){
 
-const alertBox = document.getElementById("alerts");
+const alertBox = document.getElementById("alerts")
 
-alertBox.innerHTML="";
+alertBox.innerHTML=""
 
-const alerts = stocks.filter(s => (s.insight || "") !== "✅ 正常");
+const alerts = stocks.filter(
+s => (s.insight || "") !== "✅ 正常"
+)
 
-if(alerts.length===0){
+if(alerts.length === 0){
 
-alertBox.innerHTML='<p style="color:#52c41a">✅ 目前無重大異動</p>';
+alertBox.innerHTML =
+'<p style="color:#52c41a">✅ 目前無重大異動</p>'
 
-return;
+return
 
 }
 
 alerts.forEach(stock=>{
 
-const tag=document.createElement("div");
+const tag=document.createElement("div")
 
-if(stock.inflow>10){
+const inflow = Number(stock.inflow) || 0
 
-tag.className="alert-tag tag-critical";
+if(inflow>10){
 
-}else if(stock.inflow>5){
+tag.className="alert-tag tag-critical"
 
-tag.className="alert-tag tag-warning";
+}else if(inflow>5){
+
+tag.className="alert-tag tag-warning"
 
 }else{
 
-tag.className="alert-tag";
+tag.className="alert-tag"
 
 }
 
-tag.innerText=`${stock.name} (${stock.code}) : ${stock.insight} | 淨流入 ${stock.inflow}億`;
+tag.innerText =
+`${stock.name} (${stock.code}) : ${stock.insight} | 淨流入 ${inflow}億`
 
-alertBox.appendChild(tag);
+alertBox.appendChild(tag)
 
-});
+})
 
 }
 
 function renderChart(stocks){
 
-const ctx=document.getElementById("myChart").getContext("2d");
+const ctx=document.getElementById("myChart").getContext("2d")
 
 const labels=stocks.map((s,i)=>{
 
-const rankChange=s.rank_change||0;
+const rankChange = s.rank_change || 0
 
-let change="─";
+let change="─"
 
-if(rankChange>0) change=`↑${rankChange}`;
-if(rankChange<0) change=`↓${Math.abs(rankChange)}`;
+if(rankChange>0) change=`↑${rankChange}`
+if(rankChange<0) change=`↓${Math.abs(rankChange)}`
 
-return `${i+1}. ${s.name} [${change}]`;
+return `${i+1}. ${s.name} [${change}]`
 
-});
+})
 
-const inflowData=stocks.map(s=>s.inflow||0);
-const shortData=stocks.map(s=>s.short_today||0);
+const inflowData = stocks.map(s => Number(s.inflow) || 0)
+const shortData = stocks.map(s => Number(s.short_today) || 0)
 
-const maxInflow=inflowData.length?Math.max(...inflowData.map(Math.abs)):10;
-const maxShort=shortData.length?Math.max(...shortData):10;
+const maxInflow = Math.max(...inflowData.map(Math.abs),10)
+const maxShort = Math.max(...shortData,10)
 
-if(myChart){myChart.destroy()}
+if(myChart !== null){
+myChart.destroy()
+}
 
-myChart=new Chart(ctx,{
+myChart = new Chart(ctx,{
 
 type:"bar",
 
@@ -320,6 +345,7 @@ tension:.3
 options:{
 
 indexAxis:"y",
+
 responsive:true,
 maintainAspectRatio:false,
 animation:false,
@@ -350,28 +376,27 @@ grid:{drawOnChartArea:false}
 
 }
 
-});
+})
 
 }
 
 function showError(message){
 
-document.getElementById("time").innerHTML=`❌ 載入失敗`;
+document.getElementById("time").innerHTML="❌ 載入失敗"
 
 document.getElementById("alerts").innerHTML=
 `<div class="error-msg">
 <strong>⚠️ 無法載入 data.json</strong><br>
 ${message}
-</div>`;
+</div>`
 
-document.querySelector(".chart-box").style.display="none";
+document.querySelector(".chart-box").style.display="none"
 
 }
 
-loadData();
+loadData()
 
-/* auto refresh every 5 minutes */
-setInterval(loadData,300000);
+setInterval(loadData,300000)
 
 </script>
 
