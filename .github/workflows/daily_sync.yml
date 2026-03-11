@@ -1,26 +1,38 @@
 name: Daily Sync
+
 on:
   schedule:
-    - cron: '40 9 * * 1-5' # 香港時間 17:40
-  workflow_dispatch: # 允許手動點擊執行
+    - cron: '40 9 * * 1-5'   # 09:40 UTC = 17:40 Hong Kong
+  workflow_dispatch:
+
 jobs:
   run:
     runs-on: ubuntu-latest
+
     permissions:
       contents: write
+
     steps:
-      - uses: actions/checkout@v4 # 🚀 從 v3 升級到 v4
-      - name: Set up Python
-        uses: actions/setup-python@v5 # 🚀 從 v4 升級到 v5
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
           python-version: '3.9'
-      - run: pip install -r requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
       - name: Run Analysis
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           CHAT_ID: ${{ secrets.CHAT_ID }}
         run: python main.py
-      - name: Commit
+
+      - name: Commit updated data
         run: |
           git config --global user.name "Bot"
           git config --global user.email "bot@github.com"
