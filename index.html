@@ -1,14 +1,12 @@
 <!DOCTYPE html>
-<html lang="zh-HK">
+<html>
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HK Stock AI Dashboard - Top 30</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
-*{box-sizing:border-box}
-body{font-family:-apple-system,"PingFang HK","Microsoft YaHei",sans-serif;background:linear-gradient(135deg,#f4f7f9 0%,#e8eef2 100%);margin:0;padding:15px;}
-.card{background:white;padding:20px;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.12);max-width:1200px;margin:auto;}
+body{font-family:-apple-system,"PingFang HK","Microsoft YaHei",sans-serif;margin:0;padding:15px;background:#f4f7f9;}
+.card{background:#fff;padding:20px;border-radius:12px;max-width:1200px;margin:auto;box-shadow:0 4px 20px rgba(0,0,0,0.12);}
 .header{border-left:5px solid #ff4d4f;padding-left:15px;margin-bottom:20px;}
 .header h2{margin:0;color:#262626;font-size:24px;}
 .header p{color:#8c8c8c;font-size:13px;margin:5px 0 0 0;}
@@ -27,141 +25,97 @@ body{font-family:-apple-system,"PingFang HK","Microsoft YaHei",sans-serif;backgr
 </style>
 </head>
 <body>
+
 <div class="card">
-<div class="header">
-<h2>📊 港股 AI 資金監控看板 (Top 30)</h2>
-<p id="time">正在載入數據...</p>
-</div>
-<div id="alerts">
-<div class="loading"><div class="spinner"></div><p>數據載入中...</p></div>
-</div>
-<div class="chart-box">
-<canvas id="myChart"></canvas>
-</div>
+  <div class="header">
+    <h2>📊 港股 AI 資金監控看板 (Top 30)</h2>
+    <p id="time">正在載入數據...</p>
+  </div>
+
+  <div id="alerts">
+    <div class="loading">
+      <div class="spinner"></div>
+      <p>數據載入中...</p>
+    </div>
+  </div>
+
+  <div class="chart-box">
+    <canvas id="myChart"></canvas>
+  </div>
 </div>
 
 <script>
-const DATA_URL = "data.json";
 let myChart = null;
+const DATA_URL = "data.json";
 
 async function loadData(){
-    try{
-        const response = await fetch(DATA_URL + "?t=" + Date.now());
-        if(!response.ok) throw new Error(`HTTP ${response.status}`);
-        const data = await response.json();
-        if(!data.stocks || !Array.isArray(data.stocks)) throw new Error("數據格式錯誤");
-        renderDashboard(data);
-    }catch(error){
-        console.error("載入失敗",error);
-        showError(error.message);
-    }
+  try {
+    const res = await fetch(DATA_URL + "?t=" + Date.now());
+    if(!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    if(!data.stocks || !Array.isArray(data.stocks)) throw new Error("數據格式錯誤");
+    renderDashboard(data);
+  } catch(err){
+    console.error("載入失敗", err);
+    document.getElementById("time").innerHTML="❌ 載入失敗";
+    document.getElementById("alerts").innerHTML=`<div class="error-msg"><strong>⚠️ 無法載入 data.json</strong><br>${err.message}</div>`;
+    document.querySelector(".chart-box").style.display="none";
+  }
 }
 
 function renderDashboard(data){
-    const stocks = data.stocks || [];
-    const updateTime = data.update_time || "未知";
-    const timeElement = document.getElementById("time");
-    timeElement.innerText = `最後更新: ${updateTime}`;
-
-    const isAllZero = stocks.every(s => s.inflow===0 && s.short_today===0);
-    if(isAllZero){
-        timeElement.innerHTML += "<br><b style='color:#fa8c16'>⚠️ 數據源尚未發布</b>";
-    }
-
-    renderAlerts(stocks);
-    renderChart(stocks);
+  const stocks = data.stocks;
+  const timeElement = document.getElementById("time");
+  timeElement.innerText = `最後更新: ${data.update_time}`;
+  renderAlerts(stocks);
+  renderChart(stocks);
 }
 
 function renderAlerts(stocks){
-    const alertBox = document.getElementById("alerts");
-    alertBox.innerHTML="";
-    const alerts = stocks.filter(s => (s.insight || "") !== "✅ 正常");
-    if(alerts.length===0){
-        alertBox.innerHTML='<p style="color:#52c41a">✅ 目前無重大異動</p>';
-        return;
-    }
-    alerts.forEach(stock=>{
-        const tag=document.createElement("div");
-        if(stock.inflow>10){ tag.className="alert-tag tag-critical"; }
-        else if(stock.inflow>5){ tag.className="alert-tag tag-warning"; }
-        else{ tag.className="alert-tag"; }
-        tag.innerText=`${stock.name} (${stock.code}) : ${stock.insight} | 淨流入 ${stock.inflow}億`;
-        alertBox.appendChild(tag);
-    });
+  const alertBox = document.getElementById("alerts");
+  alertBox.innerHTML="";
+  const alerts = stocks.filter(s=>s.insight!=="✅ 正常");
+  if(alerts.length===0){
+    alertBox.innerHTML='<p style="color:#52c41a">✅ 目前無重大異動</p>';
+    return;
+  }
+  alerts.forEach(stock=>{
+    const tag=document.createElement("div");
+    tag.className= stock.short_today>10?"alert-tag tag-critical":
+                   stock.short_today>5?"alert-tag tag-warning":"alert-tag";
+    tag.innerText=`${stock.name} (${stock.code}) : ${stock.insight} | 沽空率 ${stock.short_today}%`;
+    alertBox.appendChild(tag);
+  });
 }
 
 function renderChart(stocks){
-    const ctx=document.getElementById("myChart").getContext("2d");
-    const labels=stocks.map((s,i)=>`${i+1}. ${s.name}`);
-    const inflowData=stocks.map(s=>s.inflow||0);
-    const shortTodayData=stocks.map(s=>s.short_today||0);
-    const shortAvgData=stocks.map(s=>s.short_avg||0);
-
-    const maxInflow=Math.max(...inflowData.map(Math.abs),10);
-    const maxShort=Math.max(...shortTodayData.concat(shortAvgData),10);
-
-    if(myChart){ myChart.destroy(); }
-
-    myChart=new Chart(ctx,{
-        type:"bar",
-        data:{
-            labels:labels,
-            datasets:[
-                {
-                    label:"南向資金淨流入 (億港元)",
-                    data:inflowData,
-                    backgroundColor:inflowData.map(v=>v>10?"#ff4d4f":v>0?"#ff7875":v<-5?"#52c41a":"#95de64"),
-                    xAxisID:"x1",
-                    barThickness:14
-                },
-                {
-                    type:"line",
-                    label:"今日沽空率 (%)",
-                    data:shortTodayData,
-                    borderColor:"#1890ff",
-                    backgroundColor:"rgba(24,144,255,0.1)",
-                    borderWidth:2,
-                    pointRadius:4,
-                    xAxisID:"x2",
-                    tension:0.3
-                },
-                {
-                    type:"line",
-                    label:"5日平均沽空率 (%)",
-                    data:shortAvgData,
-                    borderColor:"#ffa940",
-                    backgroundColor:"rgba(255,169,64,0.1)",
-                    borderWidth:2,
-                    pointRadius:2,
-                    xAxisID:"x2",
-                    borderDash: [5,5],
-                    tension:0.3
-                }
-            ]
-        },
-        options:{
-            indexAxis:"y",
-            responsive:true,
-            maintainAspectRatio:false,
-            animation:false,
-            interaction:{ mode:"index", intersect:false },
-            scales:{
-                x1:{ type:"linear", position:"bottom", suggestedMin:Math.min(-5,-maxInflow-2), suggestedMax:Math.max(15,maxInflow+2) },
-                x2:{ type:"linear", position:"top", suggestedMin:0, suggestedMax:Math.max(60,maxShort+5), grid:{drawOnChartArea:false} }
-            }
-        }
-    });
+  const ctx=document.getElementById("myChart").getContext("2d");
+  const labels=stocks.map((s,i)=>`${i+1}. ${s.name}`);
+  const inflowData=stocks.map(s=>s.short_today);
+  if(myChart) myChart.destroy();
+  myChart=new Chart(ctx,{
+    type:"bar",
+    data:{
+      labels,
+      datasets:[{
+        label:"當日沽空比率 (%)",
+        data:inflowData,
+        backgroundColor:"#1890ff"
+      }]
+    },
+    options:{
+      indexAxis:"y",
+      responsive:true,
+      maintainAspectRatio:false,
+      animation:false
+    }
+  });
 }
 
-function showError(message){
-    document.getElementById("time").innerHTML=`❌ 載入失敗`;
-    document.getElementById("alerts").innerHTML=
-    `<div class="error-msg"><strong>⚠️ 無法載入 data.json</strong><br>${message}</div>`;
-    document.querySelector(".chart-box").style.display="none";
-}
-
+// Auto refresh every 5 min
+setInterval(loadData, 300000);
 loadData();
-setInterval(loadData,300000); // auto-refresh every 5 min
 </script>
+
 </body>
 </html>
