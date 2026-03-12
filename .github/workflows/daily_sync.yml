@@ -1,39 +1,44 @@
-name: Daily Sync
+name: Daily HK Stock Sync
 
 on:
   schedule:
-    - cron: '40 9 * * 1-5'  # 17:40 HKT (UTC+8)
-  workflow_dispatch:  # allows manual trigger
+    - cron: '40 9 * * 1-5'  # 17:40 HKT = 9:40 UTC
+  workflow_dispatch:  # manual trigger
 
 jobs:
-  run:
+  update-data:
     runs-on: ubuntu-latest
     permissions:
       contents: write
 
     steps:
+      # 1️⃣ Checkout repo
       - uses: actions/checkout@v4
 
-      - name: Set up Python
+      # 2️⃣ Set up Python
+      - name: Setup Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
+      # 3️⃣ Install dependencies
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install requests pandas
+          pip install pandas requests
 
+      # 4️⃣ Run the main analysis script
       - name: Run HK Stock Analysis
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           CHAT_ID: ${{ secrets.CHAT_ID }}
         run: python main.py
 
+      # 5️⃣ Commit and push data.json updates
       - name: Commit updated data.json
         run: |
-          git config --global user.name "Bot"
+          git config --global user.name "HK Stock Bot"
           git config --global user.email "bot@github.com"
           git add data.json
-          git commit -m "Update Data: $(date '+%Y-%m-%d %H:%M')" || echo "No changes"
+          git commit -m "Update HK Stock Data: $(date '+%Y-%m-%d %H:%M')" || echo "No changes to commit"
           git push
