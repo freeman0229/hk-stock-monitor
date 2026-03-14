@@ -117,6 +117,8 @@ def get_daily_quotation(date: datetime = None) -> pd.DataFrame:
 
         log.info("Daily quotation c.htm: %d chars (pre: %s) for %s",
                  len(raw), "yes" if pre else "no", date_str)
+        # Debug: show first 500 chars of pre block to verify format
+        log.info("PRE BLOCK SAMPLE: %s", repr(text[:500]))
 
         records = []
         seen_codes = set()
