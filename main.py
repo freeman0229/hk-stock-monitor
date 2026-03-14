@@ -1,6 +1,7 @@
 import os, json, time, logging, re
 import pandas as pd
 import requests
+import holidays
 from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
 
@@ -13,13 +14,32 @@ log = logging.getLogger(__name__)
 TELEGRAM_TOKEN   = os.getenv("TELEGRAM_TOKEN", "").strip()
 CHAT_ID          = os.getenv("CHAT_ID", "").strip()
 TOP_OUTPUT       = 30
-SHORT_DROP_RATIO = 0.75
 MAX_LOOKBACK     = 30   # calendar days to look back when collecting history
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (compatible; DataBot/1.0)",
     "Referer":    "https://www.hkex.com.hk/",
 }
+
+# =========================
+# TRADING DAY CHECK
+# =========================
+HK_HOLIDAYS = holidays.HongKong()
+
+def is_trading_day(date: datetime = None) -> bool:
+    """Return True if date is a HK weekday that is not a public holiday."""
+    date = date or datetime.now()
+    return date.weekday() < 5 and date.date() not in HK_HOLIDAYS
+
+def business_days_back(date: datetime, n: int) -> datetime:
+    """Return the date that is n HK business days before `date`."""
+    d = date
+    count = 0
+    while count < n:
+        d -= timedelta(days=1)
+        if d.weekday() < 5 and d.date() not in HK_HOLIDAYS:
+            count += 1
+    return d
 
 # =========================
 # HELPERS
@@ -434,12 +454,29 @@ def get_ccass_delta_and_avg(stock_codes: list, today_map: dict, days: int = 5):
             if sh0 > 0 or sh1 > 0:
                 deltas.append(sh0 - sh1)
 
+        # Consecutive days CCASS has been moving in the same direction as today
+        # Positive = N days of consecutive increases; negative = consecutive decreases
+        consec = 0
+        if delta != 0:
+            direction = 1 if delta > 0 else -1
+            for i in range(min(days, len(available_dates) - 1)):
+                d0 = store[available_dates[i]]
+                d1 = store[available_dates[i + 1]]
+                sh0 = d0.get(code, {}).get("shareholding", 0)
+                sh1 = d1.get(code, {}).get("shareholding", 0)
+                day_delta = sh0 - sh1
+                if day_delta * direction > 0:
+                    consec += direction
+                else:
+                    break
+
         avg5 = round(sum(deltas) / len(deltas), 0) if deltas else 0.0
 
         rows.append({
-            "stock_code":   code,
-            "ccass_delta":  delta,
-            "ccass_avg5":   avg5,
+            "stock_code":    code,
+            "ccass_delta":   delta,
+            "ccass_avg5":    avg5,
+            "ccass_consec":  consec,
         })
 
     return pd.DataFrame(rows)
@@ -459,6 +496,194 @@ def save_daily_turnover(date: datetime, df: pd.DataFrame):
     cutoff = (datetime.now() - timedelta(days=MAX_LOOKBACK)).strftime("%Y%m%d")
     store = {k: v for k, v in store.items() if k >= cutoff}
     save_json_store(DAILY_TV_FILE, store)
+
+
+# =========================
+# STOCK TYPE CLASSIFICATION & SIGNAL LOGIC
+# =========================
+
+# Known ETFs and their normal short ratio range
+ETF_CODES = {
+    "02800", "02828", "03033", "03032", "03188", "02846",
+    "03140", "03037", "03011", "02823",
+}
+
+# Known energy / bank / utility "stable" stocks
+STABLE_CODES = {
+    "00883",  # CNOOC
+    "00386",  # Sinopec
+    "00857",  # PetroChina
+    "01398",  # ICBC
+    "03988",  # Bank of China
+    "02388",  # BOC HK
+    "00939",  # CCB
+    "01288",  # ABC
+    "00002",  # CLP Holdings
+    "00006",  # Power Assets
+    "00003",  # HK & China Gas
+    "00066",  # MTR
+}
+
+# Name-based fallback keywords for blue chips
+BLUECHIP_KEYWORDS = (
+    "TENCENT", "MEITUAN", "ALIBABA", "BABA", "XIAOMI",
+    "HSBC", "AIA", "PING AN", "HKEX", "CK ", "HENDERSON",
+    "SHK", "SWIRE", "GALAXY", "SANDS", "MELCO",
+)
+
+STABLE_KEYWORDS = (
+    "BANK", "ENERGY", "POWER", "GAS", "PETRO",
+    "SINOPEC", "CNOOC", "MTR", "UTILITY",
+)
+
+def classify_stock(code: str, name: str) -> str:
+    """
+    Returns one of: 'etf', 'stable', 'bluechip', 'general'
+    ETF       – index ETFs; normal short range 40–70%
+    Stable    – energy, banks, utilities; normal range 5–10%
+    Bluechip  – large-cap names; normal range 10–20%
+    General   – everything else; normal range 10–25%
+    """
+    c = code.zfill(5)
+    n = name.upper()
+    if c in ETF_CODES:
+        return "etf"
+    if c in STABLE_CODES or any(k in n for k in STABLE_KEYWORDS):
+        return "stable"
+    if any(k in n for k in BLUECHIP_KEYWORDS):
+        return "bluechip"
+    return "general"
+
+
+# Per-type thresholds
+# (normal_lo, normal_hi, warning_change_pct, cover_threshold_pct)
+# cover_threshold_pct: short_ratio must DROP below this fraction of avg to signal covering
+THRESHOLDS = {
+    #           normal_lo  normal_hi  spike_warn  cover_drop
+    "etf":      (40.0,      70.0,      15.0,       0.35),
+    "stable":   ( 5.0,      10.0,      15.0,       0.50),
+    "bluechip": (10.0,      20.0,      10.0,       0.40),
+    "general":  (10.0,      25.0,      15.0,       0.40),
+}
+
+
+def _turnover_avg5(code: str, daily_tv_store: dict) -> float:
+    """Average of the 5 most recent stored daily turnover values for a stock."""
+    recent_days = sorted(daily_tv_store.keys(), reverse=True)[:5]
+    vals = [daily_tv_store[d].get(code, 0) for d in recent_days]
+    valid = [v for v in vals if v > 0]
+    return sum(valid) / len(valid) if valid else 0.0
+
+def _value_at(code: str, date_key: str, store: dict, field: str = None) -> float:
+    """
+    Look up a stored value for a stock on a specific date key (YYYYMMDD).
+    If field is None, the store maps code -> float directly.
+    If field is set, the store maps code -> {field: float, ...}.
+    Returns 0.0 if not found.
+    """
+    day = store.get(date_key, {})
+    val = day.get(code, {} if field else 0)
+    if field:
+        return float(val.get(field, 0)) if isinstance(val, dict) else 0.0
+    return float(val)
+
+
+def classify_insight(
+    code: str,
+    stock_type: str,
+    short_ratio: float,       # today's short ratio (T)
+    short_avg5: float,        # 5-day avg short ratio ending at T
+    short_ratio_t2: float,    # short ratio at T-2 business days (aligned with today's CCASS)
+    turnover: int,            # today's turnover (T)
+    turnover_avg5: float,     # 5-day avg turnover ending at T
+    turnover_t2: float,       # turnover at T-2 business days (aligned with today's CCASS)
+    ccass_pct: float,
+    ccass_delta: int,
+    ccass_avg5: float,
+    ccass_consec: int,
+) -> str:
+    """
+    Priority (highest → lowest):
+
+      1. 🔥 南向重倉       — CCASS % > 5%: persistent southbound conviction
+      2. 🏦 機構增持        — Steady multi-day CCASS build (≥3 settlement days = ≥6 trading days)
+                              + short ratio at T-2 stable + turnover at T-2 only mildly elevated
+      3. 🚪 避險盤撤退      — Single-day CCASS spike (consec ≤ 1)
+                              + short ratio at T-2 collapsed + turnover at T-2 exploded
+      4. 🚨 異常高沽空      — Short ratio (today) spikes well above type's normal ceiling
+      5. ⚠️ 空頭平倉信號    — Sharp short drop today + volume surge today (no CCASS confirmation)
+      6. 📉 沽空偏高        — Elevated but not extreme for this stock type
+      7. 📈 沽空偏低        — Unusually low short ratio for this type
+      8. ✅ 正常
+
+    T+2 alignment:
+      CCASS today reflects trades settled 2 business days ago (T-2).
+      For CCASS cross-signals (機構增持, 避險盤撤退) we compare CCASS delta against
+      short_ratio_t2 and turnover_t2 — the short/volume data from the day the
+      underlying trades actually occurred — rather than today's data.
+      This prevents false signals from comparing stale CCASS against today's market.
+    """
+    lo, hi, spike_warn, cover_drop = THRESHOLDS.get(stock_type, THRESHOLDS["general"])
+
+    # Today's turnover ratio (for signals 4/5 which are about today's market)
+    turnover_ratio_today = turnover / turnover_avg5 if turnover_avg5 > 0 else 1.0
+
+    # T-2 turnover ratio and short change (for CCASS-aligned signals 2/3)
+    turnover_ratio_t2 = turnover_t2 / turnover_avg5 if turnover_avg5 > 0 else 1.0
+    short_change_t2   = ((short_ratio_t2 - short_avg5) / short_avg5
+                         if short_avg5 > 0 else 0.0)
+
+    # ── 1. Persistent southbound conviction ──
+    if ccass_pct > 5:
+        return "🔥 南向重倉"
+
+    # ── 2. 機構增持 — genuine institutional accumulation ──
+    # Uses T-2 aligned short/turnover so we're comparing CCASS to the day trades happened.
+    # Conditions:
+    #   a) CCASS building steadily for ≥3 settlement days (each = ~2 trading days of actual buying)
+    #   b) Short ratio at T-2 was stable — no panic covering on trade day
+    #   c) Turnover at T-2 only mildly elevated — deliberate accumulation, not urgent
+    #   d) Today's CCASS delta is meaningful
+    if (ccass_consec >= 3
+            and abs(short_change_t2) <= 0.20
+            and 1.10 <= turnover_ratio_t2 <= 1.50
+            and ccass_delta > 0
+            and (ccass_avg5 == 0 or ccass_delta >= ccass_avg5 * 0.5)):
+        return "🏦 機構增持"
+
+    # ── 3. 避險盤撤退 — short covering / risk-off exit ──
+    # Uses T-2 aligned short/turnover — checks what short sellers were doing
+    # on the actual day the CCASS-visible trades settled from.
+    # Conditions:
+    #   a) CCASS spiked in one settlement day only (sudden, not a build)
+    #   b) Short ratio at T-2 collapsed vs avg — panic covering on trade day
+    #   c) Turnover at T-2 exploded — urgency / forced close-out on trade day
+    if (ccass_delta > 0
+            and ccass_consec <= 1
+            and short_avg5 > lo
+            and short_ratio_t2 < short_avg5 * cover_drop
+            and turnover_ratio_t2 > 1.50):
+        return "🚪 避險盤撤退"
+
+    # ── 4. Extreme short spike (today's market) ──
+    if short_ratio > hi + spike_warn:
+        return "🚨 異常高沽空"
+
+    # ── 5. Short covering without CCASS confirmation (today's market) ──
+    if (short_avg5 > lo
+            and short_ratio < short_avg5 * cover_drop
+            and turnover_ratio_today > 1.30):
+        return "⚠️ 空頭平倉信號"
+
+    # ── 6. Elevated short for this type ──
+    if short_ratio > hi:
+        return "📉 沽空偏高"
+
+    # ── 7. Unusually low short for this type ──
+    if short_ratio > 0 and short_ratio < lo * 0.5:
+        return "📈 沽空偏低"
+
+    return "✅ 正常"
 
 
 # =========================
@@ -499,6 +724,15 @@ def run_analysis():
                                        daily_turnover_map=daily_tv_store)
     short_avg_map = dict(zip(df_short_avg["stock_code"], df_short_avg["short_ratio_avg5"]))
 
+    # ── T-2 alignment ──
+    # CCASS today reflects trades that settled 2 HK business days ago.
+    # We look up the short ratio and turnover from that date so cross-signals
+    # (機構增持 / 避險盤撤退) compare CCASS against data from when trades happened.
+    t2_date     = business_days_back(today, 2)
+    t2_date_key = t2_date.strftime("%Y%m%d")
+    short_history_store = load_json_store(SHORT_HISTORY_FILE)
+    log.info("T-2 date for CCASS alignment: %s", t2_date_key)
+
     # ── 4. Fetch today's CCASS southbound ──
     df_ccass = get_ccass_southbound(today)
     today_ccass_map = {}
@@ -512,8 +746,9 @@ def run_analysis():
     df_ccass_stats = get_ccass_delta_and_avg(stock_codes, today_ccass_map, days=5)
     save_ccass(today, df_ccass)
 
-    ccass_delta_map = dict(zip(df_ccass_stats["stock_code"], df_ccass_stats["ccass_delta"]))
-    ccass_avg5_map  = dict(zip(df_ccass_stats["stock_code"], df_ccass_stats["ccass_avg5"]))
+    ccass_delta_map  = dict(zip(df_ccass_stats["stock_code"], df_ccass_stats["ccass_delta"]))
+    ccass_avg5_map   = dict(zip(df_ccass_stats["stock_code"], df_ccass_stats["ccass_avg5"]))
+    ccass_consec_map = dict(zip(df_ccass_stats["stock_code"], df_ccass_stats["ccass_consec"]))
 
     # ── 5. Build result rows ──
     results = []
@@ -525,27 +760,47 @@ def run_analysis():
         ccass_pct    = today_pct_map.get(code, 0.0)
         ccass_delta  = ccass_delta_map.get(code, 0)
         ccass_avg5   = ccass_avg5_map.get(code, 0.0)
+        ccass_consec = ccass_consec_map.get(code, 0)
+        tv_avg5      = _turnover_avg5(code, daily_tv_store)
 
-        # ── Signal logic ──
-        insight = "✅ 正常"
-        if short_ratio > 15:
-            insight = "🚨 高沽空比率"
-        elif short_avg5 > 0 and short_ratio < short_avg5 * SHORT_DROP_RATIO:
-            insight = "⚠️ 空頭平倉"
-        if ccass_pct > 5:
-            insight = "🔥 南向重倉"   # CCASS signal overrides short signal
+        # T-2 values: short ratio and turnover from the day CCASS trades actually occurred
+        tv_t2_raw      = _value_at(code, t2_date_key, daily_tv_store)
+        short_tv_t2    = _value_at(code, t2_date_key, short_history_store, field="short_turnover")
+        short_ratio_t2 = round(short_tv_t2 / tv_t2_raw * 100, 2) if tv_t2_raw > 0 else short_ratio
+        turnover_t2    = tv_t2_raw if tv_t2_raw > 0 else float(row.turnover)
+
+        # ── Stock type + signal ──
+        stock_type = classify_stock(code, row.name)
+        insight = classify_insight(
+            code            = code,
+            stock_type      = stock_type,
+            short_ratio     = short_ratio,
+            short_avg5      = short_avg5,
+            short_ratio_t2  = short_ratio_t2,
+            turnover        = int(row.turnover),
+            turnover_avg5   = tv_avg5,
+            turnover_t2     = turnover_t2,
+            ccass_pct       = ccass_pct,
+            ccass_delta     = int(ccass_delta),
+            ccass_avg5      = float(ccass_avg5),
+            ccass_consec    = int(ccass_consec),
+        )
 
         results.append({
-            "rank":          i,
-            "code":          code,
-            "name":          row.name,
-            "turnover":      int(row.turnover),
-            "short_ratio":   round(short_ratio, 2),    # today's short % of turnover
-            "short_avg5":    round(short_avg5, 2),     # 5-day avg short ratio %
-            "ccass_pct":     round(ccass_pct, 2),      # % of listed shares held
-            "ccass_delta":   int(ccass_delta),          # change vs previous day (shares)
-            "ccass_avg5":    int(ccass_avg5),           # avg daily delta over 5 days
-            "insight":       insight,
+            "rank":           i,
+            "code":           code,
+            "name":           row.name,
+            "stock_type":     stock_type,
+            "turnover":       int(row.turnover),
+            "short_ratio":    round(short_ratio, 2),
+            "short_avg5":     round(short_avg5, 2),
+            "short_ratio_t2": round(short_ratio_t2, 2),  # short ratio on CCASS trade date
+            "ccass_trade_date": t2_date.strftime("%Y-%m-%d"),  # actual trade date CCASS reflects
+            "ccass_pct":      round(ccass_pct, 2),
+            "ccass_delta":    int(ccass_delta),
+            "ccass_avg5":     int(ccass_avg5),
+            "ccass_consec":   int(ccass_consec),
+            "insight":        insight,
         })
 
     # ── 6. Persist output ──
@@ -570,9 +825,12 @@ def run_analysis():
         if flagged:
             lines.append("─────────────")
             for s in flagged[:5]:
-                lines.append(f"{s['insight']} {s['name']} | 沽空率 {s['short_ratio']}% | CCASS {s['ccass_pct']}%")
+                lines.append(f"{s['insight']} {s['name']} | 沽空率 {s['short_ratio']}% | CCASS Δ {s['ccass_delta']:,}")
         send_telegram("\n".join(lines))
 
 
 if __name__ == "__main__":
-    run_analysis()
+    if not is_trading_day():
+        log.info("Not a HK trading day — skipping.")
+    else:
+        run_analysis()
