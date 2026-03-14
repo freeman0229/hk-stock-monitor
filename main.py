@@ -93,8 +93,18 @@ def save_json_store(path, data):
 # =========================
 def get_daily_quotation(date: datetime = None) -> pd.DataFrame:
     """
-    Returns Top-N stocks by HKD turnover.
+    Returns Top-N stocks by HKD turnover from HKEX daily quotation file.
     Columns: stock_code, name, turnover, shares
+
+    File format (fixed-width text):
+      QUOTATIONS section — two lines per stock:
+        Line 1:  "     700 TENCENT         HKD   60.00    60.05    60.65       6,493,671"
+        Line 2:  "                              60.05    60.00    59.85     390,236,735"
+      The LAST number on line 2 is the HKD turnover.
+
+      10 MOST ACTIVES (DOLLARS) — one line per stock, already sorted:
+        "  700 TENCENT         HKD      26,800,185,739         47,623,240  578.00   548.00"
+        Col order: TURNOVER($)  SHARES
     """
     date = date or datetime.now()
     date_str = date.strftime("%y%m%d")
@@ -105,115 +115,63 @@ def get_daily_quotation(date: datetime = None) -> pd.DataFrame:
         resp.raise_for_status()
         text = resp.text
 
-        # The file contains multiple sections separated by dashes.
-        # "SALES RECORDS FOR ALL STOCKS" has lines like:
-        #   CODE  NAME                CUR   SHARES TRADED      TURNOVER ($)
-        # Two-line format per stock:
-        #   Line 1:  CODE  NAME  CUR  SHARES
-        #   Line 2:  (blank CODE/NAME)  CUR  PREV_CLOSE  ... TURNOVER
-        # More reliably: "SALES RECORDS OVER $500,000" subset uses same format.
-        # We parse the 10 MOST ACTIVES block for robust column positions,
-        # then scan the full SALES RECORDS block.
-
-        # ── Locate the SALES RECORDS FOR ALL STOCKS section ──
-        start_marker = "SALES RECORDS FOR ALL STOCKS"
-        end_marker   = "SALES RECORDS OVER $500,000"
-        start = text.find(start_marker)
-        end   = text.find(end_marker, start)
-        if start == -1:
-            # Fallback: use 10 MOST ACTIVES block
-            start_marker = "10 MOST ACTIVES (DOLLARS)"
-            end_marker   = "10 MOST ACTIVES (SHARES)"
-            start = text.find(start_marker)
-            end   = text.find(end_marker, start)
-
-        section = text[start:end] if start != -1 and end != -1 else text
-
-        # ── Parse fixed-width lines ──
-        # Pattern for a stock data line:
-        #   leading spaces, 4-5 digit code, spaces, NAME (up to 16 chars),
-        #   CUR (HKD/USD/CNY), spaces, SHARES, spaces, TURNOVER
-        #
-        # The SALES RECORDS section has two lines per stock.
-        # Line 1 example:   "     700 TENCENT         HKD      47,623,240    26,800,185,739"
-        # We capture: code, name, currency, shares_or_turnover_1, value_2
-        #
-        # Actually the 10 MOST ACTIVES block is already sorted by turnover and
-        # has both SHARES and TURNOVER on one line — use that for simplicity.
-        # For full list we use the SALES RECORDS which has:
-        #   CODE NAME CUR PREV.CLO / CLOSING  ASK/BID  HIGH/LOW  SHARES  TURNOVER
-        # Split across TWO lines per stock (second line has the turnover).
-
         records = []
-
-        # Regex for the "10 MOST ACTIVES (DOLLARS)" block — one line per stock:
-        # "  700 TENCENT         HKD      26,800,185,739         47,623,240  578.00   548.00"
-        most_active_pattern = re.compile(
-            r"^\s{1,6}(\d{1,6})\s+([A-Z0-9][A-Z0-9 \-&'.#/]{1,20}?)\s{2,}"
-            r"(HKD|USD|CNY|EUR|GBP)\s+([\d,]+)\s+([\d,]+)",
-            re.MULTILINE
-        )
-
-        # Locate the MOST ACTIVES (DOLLARS) block to get order
-        ma_start = text.find("10 MOST ACTIVES (DOLLARS)")
-        ma_end   = text.find("10 MOST ACTIVES (SHARES)", ma_start)
-        most_active_text = text[ma_start:ma_end] if ma_start != -1 and ma_end != -1 else ""
-
         seen_codes = set()
 
-        # Parse 10 MOST ACTIVES first (already ranked by turnover $)
-        for m in most_active_pattern.finditer(most_active_text):
-            code     = fmt_code(m.group(1))
-            name     = m.group(2).strip()
-            val_a    = to_num(m.group(4))
-            val_b    = to_num(m.group(5))
-            # In the MOST ACTIVES block: col order is TURNOVER($) then SHARES
-            turnover = val_a
-            shares   = val_b
-            if code not in seen_codes:
-                records.append({"stock_code": code, "name": name,
-                                 "turnover": turnover, "shares": shares})
-                seen_codes.add(code)
+        # ── Strategy 1: parse QUOTATIONS section (full list, two lines per stock) ──
+        # Locate the section between "QUOTATIONS" header and next dashed separator
+        quot_start = text.find("\n                                  QUOTATIONS\n")
+        quot_end   = text.find("---------------", quot_start + 10) if quot_start != -1 else -1
 
-        # ── Also parse SALES RECORDS for ALL stocks (to cover full Top-30) ──
-        # Format in SALES RECORDS FOR ALL STOCKS:
-        #   CODE  NAME   CUR  PRV.CLO/CLOSE  ASK/BID  HIGH/LOW  SHARES / TURNOVER
-        # Two lines per stock — second line has the actual TURNOVER.
-        # Pattern for the FIRST line of each stock entry (has the code):
-        sales_line_pat = re.compile(
-            r"^\s{1,6}(\d{1,6})\s+([A-Z0-9][A-Z0-9 \-&'.#/]{1,20}?)\s{2,}"
-            r"(HKD|USD|CNY|EUR|GBP)\s+([\d,.]+)\s+([\d,.]+)\s+([\d,.]+)\s+([\d,]+)$",
-            re.MULTILINE
-        )
-        # Second line (no code, just values): turnover is the last big number
-        # Simpler approach: collect all lines with a leading code, then grab
-        # the turnover from the FOLLOWING line.
-        lines = section.split("\n")
-        i = 0
-        while i < len(lines):
-            line = lines[i]
-            m = re.match(
-                r"^\s{1,6}(\d{1,6})\s+([A-Z0-9][A-Z0-9 \-&'.#/]{1,20}?)\s{2,}"
-                r"(HKD|USD|CNY)",
-                line
-            )
-            if m:
-                code = fmt_code(m.group(1))
-                name = m.group(2).strip()
-                # Turnover is on the NEXT line, last number
-                if i + 1 < len(lines):
+        if quot_start != -1 and quot_end != -1:
+            section = text[quot_start:quot_end]
+            lines = section.split("\n")
+            i = 0
+            while i < len(lines):
+                line = lines[i]
+                # Line 1 pattern: 4-6 spaces, code (1-5 digits), 1+ spaces, NAME, spaces, HKD/USD/CNY
+                m = re.match(
+                    r"^\s{3,7}(\d{1,5})\s+([A-Z0-9][A-Z0-9 \-&'./#+]{1,18}?)\s{2,}"
+                    r"(HKD|USD|CNY|EUR|GBP)\s+([\d,.]+)\s+([\d,.]+)\s+([\d,.]+)\s+([\d,]+)\s*$",
+                    line
+                )
+                if m and i + 1 < len(lines):
+                    code  = fmt_code(m.group(1))
+                    name  = m.group(2).strip()
+                    # Line 2: continuation — last number is turnover ($)
                     next_line = lines[i + 1]
-                    nums = re.findall(r"[\d,]{4,}", next_line)
+                    nums = re.findall(r"[\d,]{3,}", next_line)
                     if nums and code not in seen_codes:
-                        turnover = to_num(nums[-1])   # last big number = turnover $
-                        shares_nums = re.findall(r"[\d,]{4,}", line)
-                        shares = to_num(shares_nums[-1]) if shares_nums else 0
-                        records.append({"stock_code": code, "name": name,
-                                         "turnover": turnover, "shares": shares})
-                        seen_codes.add(code)
-                i += 2
-                continue
-            i += 1
+                        turnover = to_num(nums[-1])
+                        shares   = to_num(m.group(7))
+                        if turnover > 0:
+                            records.append({"stock_code": code, "name": name,
+                                            "turnover": turnover, "shares": shares})
+                            seen_codes.add(code)
+                    i += 2
+                    continue
+                i += 1
+
+        # ── Strategy 2: parse 10 MOST ACTIVES (DOLLARS) as supplement/fallback ──
+        ma_start = text.find("10 MOST ACTIVES (DOLLARS)")
+        ma_end   = text.find("10 MOST ACTIVES (SHARES)", ma_start)
+        if ma_start != -1 and ma_end != -1:
+            ma_text = text[ma_start:ma_end]
+            # Format: CODE  NAME  CUR  TURNOVER($)  SHARES  HIGH  LOW
+            pat = re.compile(
+                r"^\s{1,5}(\d{1,5})\s+([A-Z0-9][A-Z0-9 \-&'./#+]{1,18}?)\s{2,}"
+                r"(HKD|USD|CNY|EUR|GBP)\s+([\d,]+)\s+([\d,]+)",
+                re.MULTILINE
+            )
+            for m in pat.finditer(ma_text):
+                code     = fmt_code(m.group(1))
+                name     = m.group(2).strip()
+                turnover = to_num(m.group(4))   # TURNOVER($) comes first
+                shares   = to_num(m.group(5))
+                if code not in seen_codes and turnover > 0:
+                    records.append({"stock_code": code, "name": name,
+                                    "turnover": turnover, "shares": shares})
+                    seen_codes.add(code)
 
         if not records:
             log.warning("Daily quotation: no records parsed for %s", date_str)
@@ -245,19 +203,34 @@ def get_daily_quotation(date: datetime = None) -> pd.DataFrame:
 SHORT_SELL_TODAY_URL = "https://www.hkex.com.hk/eng/stat/smstat/ssturnover/ncms/ashtmain.htm"
 
 def _parse_short_sell_text(text: str) -> pd.DataFrame:
-    """Parse HKEX fixed-width short selling text into a DataFrame."""
+    """
+    Parse HKEX fixed-width short selling text.
+
+    Actual format observed:
+      "      1  CKH HOLDINGS           2,837,000    183,215,000"
+      "    388  HKEX                   1,248,500    509,260,860"
+
+    Pattern: 4-6 spaces, code, 2 spaces, name (padded), shares(SH), turnover($)
+    """
+    # The name field is padded to ~22 chars, followed by the two numeric columns.
+    # Use a permissive pattern: leading spaces, digits, 2+ spaces, name, 2+ spaces, nums
     pat = re.compile(
-        r"^\s{1,6}(\d{1,6})\s+([A-Z0-9][A-Z0-9 \-&'.#/]{1,20}?)\s{2,}"
+        r"^\s{2,8}(\d{1,6})\s{1,3}([A-Z][A-Z0-9 \-&'./#+]{1,24}?)\s{2,}"
         r"([\d,]+)\s+([\d,]+)\s*$",
         re.MULTILINE
     )
     rows = []
     for m in pat.finditer(text):
+        code = fmt_code(m.group(1))
+        name = m.group(2).strip()
+        # Skip header-like lines
+        if name in ("NAME OF STOCK", "CODE") or not name:
+            continue
         rows.append({
-            "stock_code":      fmt_code(m.group(1)),
-            "name":            m.group(2).strip(),
-            "short_volume":    to_num(m.group(3)),
-            "short_turnover":  to_num(m.group(4)),
+            "stock_code":     code,
+            "name":           name,
+            "short_volume":   to_num(m.group(3)),
+            "short_turnover": to_num(m.group(4)),
         })
     return pd.DataFrame(rows) if rows else pd.DataFrame(
         columns=["stock_code", "name", "short_volume", "short_turnover"]
