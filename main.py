@@ -222,7 +222,10 @@ def get_short_sell_today() -> pd.DataFrame:
     try:
         resp = requests.get(SHORT_SELL_TODAY_URL, headers=HEADERS, timeout=30)
         resp.raise_for_status()
-        df = _parse_short_sell_text(resp.text)
+        # Use latin-1 which maps bytes 1:1 — the file is ASCII-compatible fixed-width
+        text = resp.content.decode("latin-1", errors="replace")
+        log.info("Short sell raw: %d chars, sample: %s", len(text), repr(text[200:350]))
+        df = _parse_short_sell_text(text)
         log.info("Short sell today: %d records", len(df))
         return df
     except Exception as e:
@@ -333,6 +336,12 @@ def get_ccass_southbound(date: datetime = None) -> pd.DataFrame:
         soup2 = BeautifulSoup(resp2.text, "html.parser")
         # Standard 4-column table: 股份代號 | 名稱 | 持股量 | 百分比
         # One row per stock, skip header row
+        tables = soup2.find_all("table")
+        table  = max(tables, key=lambda t: len(t.find_all("tr"))) if tables else None
+        if table is None:
+            log.warning("CCASS: no table found for %s", date_str)
+            return pd.DataFrame(columns=["stock_code", "name", "shareholding", "pct_listed"])
+
         all_rows = table.find_all("tr")
         log.info("CCASS table rows: %d", len(all_rows))
         if all_rows:
