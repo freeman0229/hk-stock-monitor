@@ -312,28 +312,27 @@ function renderKPIs(s) {
   `;
 }
 
-// ── ALERTS ─────────────────────────────────────────────────────────────────
-function chipClass(insight) {
-  if (insight.includes('高沽空'))   return 'chip-red';
-  if (insight.includes('空頭平倉')) return 'chip-amber';
-  if (insight.includes('南向重倉')) return 'chip-blue';
-  return 'chip-green';
-}
-
-function renderAlerts(s) {
+// ── ALERTS ─────────────────────────────────────────────────────────────────function renderAlerts(s) {
   const box = document.getElementById('alerts');
   const flagged = s.filter(x => x.insight !== '✅ 正常');
   if (!flagged.length) {
     box.innerHTML = '<span style="color:var(--green);font-size:13px">✅ 目前無重大異動</span>';
     return;
   }
-  box.innerHTML = flagged.map(x => `
-    <div class="alert-chip ${chipClass(x.insight)}">
-      ${x.insight} <strong>${x.name}</strong>
-      &nbsp;·&nbsp;沽空率 ${x.short_ratio}%
-      &nbsp;·&nbsp;CCASS Δ ${fmtSh(x.ccass_delta)}
-    </div>
-  `).join('');
+  box.innerHTML = flagged.map(x => {
+    const { chip } = insightStyle(x.insight);
+    const typeLabel = STOCK_TYPE_LABEL[x.stock_type] || x.stock_type;
+    const consec = x.ccass_consec || 0;
+    const consecStr = consec !== 0 ? ` · 連續${Math.abs(consec)}s${consec > 0 ? '增' : '減'}持` : '';
+    const tradeDateStr = (x.insight.includes('機構') || x.insight.includes('避險'))
+      ? ` · 對應交易日 ${x.ccass_trade_date||''}` : '';
+    return `
+      <div class="alert-chip ${chip}">
+        ${x.insight} <strong>${x.name}</strong>
+        &nbsp;[${typeLabel}]&nbsp;·&nbsp;沽空率 ${x.short_ratio}%&nbsp;·&nbsp;CCASS Δ ${fmtSh(x.ccass_delta)}${consecStr}${tradeDateStr}
+      </div>
+    `;
+  }).join('');
 }
 
 function fmtSh(n) {
@@ -343,35 +342,81 @@ function fmtSh(n) {
   return s + n;
 }
 
-// ── CHART ──────────────────────────────────────────────────────────────────
-const BAR_COLOR   = '#378ADD';
+// ── CHART COLOURS ──────────────────────────────────────────────────────────
 const SHORT_LINE  = '#E24B4A';
 const SHORT_DASH  = '#F09595';
-const CCASS_LINE  = '#3dffa0';
-const CCASS_DASH  = '#1a9e60';
+const CCASS_LINE  = '#1D9E75';
+const CCASS_DASH  = '#5DCAA5';
+
+const BAR_FILL = {
+  '正常':        '#378ADD55',
+  '機構增持':    '#185FA555',
+  '沽空偏低':    '#3B6D1155',
+  '沽空偏高':    '#BA751755',
+  '空頭平倉信號':'#D85A3055',
+  '避険盤撤退':  '#D85A3055',
+  '異常高沽空':  '#E24B4A55',
+  '南向重候':    '#534AB755',
+};
+const BAR_BORDER = {
+  '正常':        '#378ADD',
+  '機構增持':    '#185FA5',
+  '沽空偏低':    '#3B6D11',
+  '沽空偏高':    '#BA7517',
+  '空頭平倉信號':'#D85A30',
+  '避険盤撤退':  '#D85A30',
+  '異常高沽空':  '#E24B4A',
+  '南向重候':    '#534AB7',
+};
 
 function renderChart(s) {
   const wrap   = document.getElementById('chart-wrap');
   const legRow = document.getElementById('legend-row');
 
-  // Height: 26px per row + axis space
   const h = s.length * 26 + 80;
   wrap.style.height = h + 'px';
   wrap.innerHTML = '<canvas id="mainChart"></canvas>';
 
-  const labels   = s.map((x, i) => `${String(i+1).padStart(2,'0')} ${x.name}`);
-  const turnover = s.map(x => Math.round(x.turnover / 1e6));   // → millions HKD
+  const labels   = s.map((x, i) => `${String(i+1).padStart(2,'0')} ${x.code} ${x.name}`);
+  const turnover = s.map(x => Math.round(x.turnover / 1e6));
   const shortR   = s.map(x => x.short_ratio);
   const shortA   = s.map(x => x.short_avg5);
   const ccassD   = s.map(x => +(x.ccass_delta / 1e6).toFixed(2));
   const ccassA   = s.map(x => +(x.ccass_avg5  / 1e6).toFixed(2));
 
+  const lineLeg = [
+    { style: `background:${SHORT_LINE};height:2px;border-radius:1px;width:18px`,       label: '沽空率 今日' },
+    { style: `border-top:2px dashed ${SHORT_DASH};height:0;width:18px;margin:5px 0`,  label: '沽空率 5日均' },
+    { style: `background:${CCASS_LINE};height:2px;border-radius:1px;width:18px`,       label: 'CCASS Δ 今日' },
+    { style: `border-top:2px dashed ${CCASS_DASH};height:0;width:18px;margin:5px 0`,  label: 'CCASS Δ 5日均' },
+  ];
+  const barLeg = [
+    { fill: '#378ADD55', border: '#378ADD', label: '✅ 正常' },
+    { fill: '#185FA555', border: '#185FA5', label: '🏦 機構增持' },
+    { fill: '#3B6D1155', border: '#3B6D11', label: '📈 沽空偏低' },
+    { fill: '#BA751755', border: '#BA7517', label: '📉 沽空偏高' },
+    { fill: '#D85A3055', border: '#D85A30', label: '🚪 避險盤撤退 / ⚠️ 空頭平倉' },
+    { fill: '#E24B4A55', border: '#E24B4A', label: '🚨 異常高沽空' },
+    { fill: '#534AB755', border: '#534AB7', label: '🔥 南向重倉' },
+  ];
+
   legRow.innerHTML = `
-    <div class="leg-item"><div class="leg-dot" style="background:${BAR_COLOR}88;width:14px;height:10px;border-radius:2px;border:1px solid ${BAR_COLOR}"></div><span>成交額 (百萬 HKD)</span></div>
-    <div class="leg-item"><div class="leg-dot" style="background:${SHORT_LINE};height:2px;border-radius:1px"></div><span>沽空率 % 今日</span></div>
-    <div class="leg-item"><div class="leg-dot" style="background:transparent;border-top:2px dashed ${SHORT_DASH};height:0;width:16px;margin:5px 0"></div><span>沽空率 5日均</span></div>
-    <div class="leg-item"><div class="leg-dot" style="background:${CCASS_LINE};height:2px;border-radius:1px"></div><span>CCASS Δ 今日 (百萬股)</span></div>
-    <div class="leg-item"><div class="leg-dot" style="background:transparent;border-top:2px dashed ${CCASS_DASH};height:0;width:16px;margin:5px 0"></div><span>CCASS Δ 5日均</span></div>
+    <div style="display:flex;flex-wrap:wrap;gap:12px;width:100%;align-items:center">
+      ${lineLeg.map(l => `
+        <div class="leg-item">
+          <div style="${l.style};flex-shrink:0"></div>
+          <span>${l.label}</span>
+        </div>`).join('')}
+    </div>
+    <div style="width:100%;height:1px;background:var(--border);margin:4px 0"></div>
+    <div style="font-size:10px;color:var(--dim);letter-spacing:.06em;text-transform:uppercase;width:100%;margin-bottom:4px">成交額棒色 — 信號</div>
+    <div style="display:flex;flex-wrap:wrap;gap:10px;width:100%;align-items:center">
+      ${barLeg.map(l => `
+        <div class="leg-item">
+          <div style="width:12px;height:10px;border-radius:2px;background:${l.fill};border:1px solid ${l.border};flex-shrink:0"></div>
+          <span>${l.label}</span>
+        </div>`).join('')}
+    </div>
   `;
 
   if (chart) chart.destroy();
@@ -381,80 +426,45 @@ function renderChart(s) {
       labels,
       datasets: [
         {
-          type: 'bar',
-          label: '成交額 (百萬 HKD)',
+          type: 'bar', label: '成交額 (百萬 HKD)',
           data: turnover,
-          backgroundColor: BAR_COLOR + '55',
-          borderColor: BAR_COLOR,
-          borderWidth: 1,
-          borderRadius: 2,
-          borderSkipped: false,
-          xAxisID: 'xTurnover',
-          order: 4,
+          backgroundColor: s.map(x => BAR_FILL[x.insight]  || '#378ADD55'),
+          borderColor:     s.map(x => BAR_BORDER[x.insight] || '#378ADD'),
+          borderWidth: 1, borderRadius: 2, borderSkipped: false,
+          xAxisID: 'xTurnover', order: 4,
         },
         {
-          type: 'line',
-          label: '沽空率 % 今日',
+          type: 'line', label: '沽空率 今日',
           data: shortR,
-          borderColor: SHORT_LINE,
-          backgroundColor: 'transparent',
-          borderWidth: 2,
-          pointRadius: 3,
-          pointBackgroundColor: SHORT_LINE,
-          tension: 0,
-          borderDash: [],
-          xAxisID: 'xShort',
-          order: 1,
+          borderColor: SHORT_LINE, backgroundColor: 'transparent',
+          borderWidth: 2, pointRadius: 3, pointBackgroundColor: SHORT_LINE,
+          tension: 0, xAxisID: 'xShort', order: 1,
         },
         {
-          type: 'line',
-          label: '沽空率 5日均',
+          type: 'line', label: '沽空率 5日均',
           data: shortA,
-          borderColor: SHORT_DASH,
-          backgroundColor: 'transparent',
-          borderWidth: 1.5,
-          borderDash: [5, 4],
-          pointRadius: 2,
-          pointBackgroundColor: SHORT_DASH,
-          tension: 0,
-          xAxisID: 'xShort',
-          order: 2,
+          borderColor: SHORT_DASH, backgroundColor: 'transparent',
+          borderWidth: 1.5, borderDash: [5, 4], pointRadius: 2, pointBackgroundColor: SHORT_DASH,
+          tension: 0, xAxisID: 'xShort', order: 2,
         },
         {
-          type: 'line',
-          label: 'CCASS Δ 今日 (M股)',
+          type: 'line', label: 'CCASS Δ 今日 (M股)',
           data: ccassD,
-          borderColor: CCASS_LINE,
-          backgroundColor: 'transparent',
-          borderWidth: 2,
-          borderDash: [],
-          pointRadius: 3,
-          pointBackgroundColor: CCASS_LINE,
-          tension: 0,
-          xAxisID: 'xCcass',
-          order: 1,
+          borderColor: CCASS_LINE, backgroundColor: 'transparent',
+          borderWidth: 2, pointRadius: 3, pointBackgroundColor: CCASS_LINE,
+          tension: 0, xAxisID: 'xCcass', order: 1,
         },
         {
-          type: 'line',
-          label: 'CCASS Δ 5日均 (M股)',
+          type: 'line', label: 'CCASS Δ 5日均 (M股)',
           data: ccassA,
-          borderColor: CCASS_DASH,
-          backgroundColor: 'transparent',
-          borderWidth: 1.5,
-          borderDash: [5, 4],
-          pointRadius: 2,
-          pointBackgroundColor: CCASS_DASH,
-          tension: 0,
-          xAxisID: 'xCcass',
-          order: 2,
+          borderColor: CCASS_DASH, backgroundColor: 'transparent',
+          borderWidth: 1.5, borderDash: [5, 4], pointRadius: 2, pointBackgroundColor: CCASS_DASH,
+          tension: 0, xAxisID: 'xCcass', order: 2,
         },
       ]
     },
     options: {
-      indexAxis: 'y',
-      responsive: true,
-      maintainAspectRatio: false,
-      animation: false,
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false, animation: false,
       interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: { display: false },
@@ -464,6 +474,10 @@ function renderChart(s) {
           titleColor: '#e8eeff', bodyColor: '#6b7a9e',
           padding: 10,
           callbacks: {
+            title: items => {
+              const x = s[items[0].dataIndex];
+              return `${x.code} ${x.name}  [${x.insight}]`;
+            },
             label: ctx => {
               const v = ctx.parsed.x;
               if (ctx.datasetIndex === 0) return ` 成交額: ${v.toLocaleString()}M HKD`;
@@ -478,31 +492,26 @@ function renderChart(s) {
       },
       scales: {
         y: {
-          grid: { display: false },
-          border: { display: false },
+          grid: { display: false }, border: { display: false },
           ticks: { color: '#6b7a9e', font: { family: "'Noto Sans HK', sans-serif", size: 11 }, crossAlign: 'far' }
         },
         xTurnover: {
           type: 'linear', position: 'top',
-          grid: { color: 'rgba(30,37,53,0.8)', drawTicks: false },
-          border: { display: false },
-          ticks: { color: BAR_COLOR, font: { family: "'DM Mono', monospace", size: 10 },
+          grid: { color: 'rgba(30,37,53,0.8)', drawTicks: false }, border: { display: false },
+          ticks: { color: '#378ADD', font: { family: "'DM Mono', monospace", size: 10 },
                    callback: v => v >= 1000 ? (v/1000).toFixed(0)+'B' : v+'M', maxTicksLimit: 6 },
-          title: { display: true, text: '成交額 (HKD)', color: BAR_COLOR, font: { size: 10 } },
+          title: { display: true, text: '成交額 (HKD)', color: '#378ADD', font: { size: 10 } },
         },
         xShort: {
           type: 'linear', position: 'bottom',
-          grid: { display: false },
-          border: { display: false },
+          grid: { display: false }, border: { display: false },
           ticks: { color: SHORT_LINE, font: { family: "'DM Mono', monospace", size: 10 },
                    callback: v => v + '%', maxTicksLimit: 6 },
           title: { display: true, text: '沽空率 %', color: SHORT_LINE, font: { size: 10 } },
         },
         xCcass: {
           type: 'linear', position: 'bottom',
-          grid: { display: false },
-          border: { display: false },
-          offset: true,
+          grid: { display: false }, border: { display: false }, offset: true,
           ticks: { color: CCASS_LINE, font: { family: "'DM Mono', monospace", size: 10 },
                    callback: v => (v >= 0 ? '+' : '') + v + 'M', maxTicksLimit: 6 },
           title: { display: true, text: 'CCASS Δ (M股)', color: CCASS_LINE, font: { size: 10 } },
@@ -511,36 +520,66 @@ function renderChart(s) {
     }
   });
 }
-
 // ── TABLE ──────────────────────────────────────────────────────────────────
-function badgeClass(insight) {
-  if (insight.includes('高沽空'))   return 'badge-red';
-  if (insight.includes('空頭平倉')) return 'badge-amber';
-  if (insight.includes('南向重倉')) return 'badge-blue';
-  return 'badge-green';
+const STOCK_TYPE_LABEL = { etf:'ETF', stable:'穩定型', bluechip:'藍籌', general:'一般' };
+const STOCK_TYPE_STYLE = {
+  etf:      'background:rgba(124,106,255,0.15);color:#b8aaff',
+  stable:   'background:rgba(61,255,160,0.10);color:#5fffb8',
+  bluechip: 'background:rgba(77,159,255,0.12);color:#7db8ff',
+  general:  'background:rgba(136,135,128,0.12);color:#9aa0b0',
+};
+
+function insightStyle(insight) {
+  if (insight.includes('異常高沽空'))  return { chip:'chip-red',   badge:'badge-red'   };
+  if (insight.includes('避險盤撤退'))  return { chip:'chip-red',   badge:'badge-red'   };
+  if (insight.includes('空頭平倉'))    return { chip:'chip-amber', badge:'badge-amber' };
+  if (insight.includes('南向重倉'))    return { chip:'chip-blue',  badge:'badge-blue'  };
+  if (insight.includes('機構增持'))    return { chip:'chip-blue',  badge:'badge-blue'  };
+  if (insight.includes('沽空偏高'))    return { chip:'chip-amber', badge:'badge-amber' };
+  if (insight.includes('沽空偏低'))    return { chip:'chip-green', badge:'badge-green' };
+  return { chip:'chip-green', badge:'badge-green' };
 }
 
 function deltaClass(n) {
   return n > 0 ? 'pos' : n < 0 ? 'neg' : 'neu';
 }
 
+function shortClass(x) {
+  // colour short ratio cell relative to stock type's normal ceiling
+  const ceilings = { etf:70, stable:10, bluechip:20, general:25 };
+  const ceil = ceilings[x.stock_type] || 25;
+  if (x.short_ratio > ceil + 15) return 'neg';
+  if (x.short_ratio > ceil)      return 'neg' ;
+  return '';
+}
+
 function renderTable(s) {
   const rows = s.map(x => {
-    const dc = deltaClass(x.ccass_delta);
-    const ac = deltaClass(x.ccass_avg5);
-    const tv = x.turnover >= 1e9
+    const dc  = deltaClass(x.ccass_delta);
+    const ac  = deltaClass(x.ccass_avg5);
+    const sc  = shortClass(x);
+    const tv  = x.turnover >= 1e9
       ? (x.turnover/1e9).toFixed(2)+'B'
       : (x.turnover/1e6).toFixed(0)+'M';
+    const { badge } = insightStyle(x.insight);
+    const typeStyle = STOCK_TYPE_STYLE[x.stock_type] || STOCK_TYPE_STYLE.general;
+    const typeLabel = STOCK_TYPE_LABEL[x.stock_type] || x.stock_type;
+    const consec    = x.ccass_consec || 0;
+    const consecStr = consec === 0 ? '<span style="color:var(--dim)">—</span>'
+      : `<span class="${consec > 0 ? 'pos' : 'neg'}" title="CCASS T+2: 反映 ${x.ccass_trade_date||''} 的交易">${consec > 0 ? '+' : ''}${consec}s</span>`;
     return `
       <tr>
         <td class="code-cell">${x.code}</td>
         <td>${x.name}</td>
+        <td><span style="font-size:10px;padding:2px 6px;border-radius:4px;${typeStyle}">${typeLabel}</span></td>
         <td class="mono">${tv}</td>
-        <td class="mono ${x.short_ratio > 15 ? 'neg' : ''}">${x.short_ratio.toFixed(1)}%</td>
+        <td class="mono ${sc}">${x.short_ratio.toFixed(1)}%</td>
         <td class="mono" style="color:var(--dim)">${x.short_avg5.toFixed(1)}%</td>
+        <td class="mono" style="color:var(--dim)" title="T-2 沽空率 (${x.ccass_trade_date||''})">${x.short_ratio_t2 != null ? x.short_ratio_t2.toFixed(1)+'%' : '—'}</td>
         <td class="mono ${dc}">${fmtSh(x.ccass_delta)}</td>
         <td class="mono ${ac}">${fmtSh(x.ccass_avg5)}</td>
-        <td><span class="badge ${badgeClass(x.insight)}">${x.insight}</span></td>
+        <td class="mono">${consecStr}</td>
+        <td><span class="badge ${badge}">${x.insight}</span></td>
       </tr>
     `;
   }).join('');
@@ -551,11 +590,14 @@ function renderTable(s) {
         <tr>
           <th>代號</th>
           <th>名稱</th>
+          <th>類型</th>
           <th>成交額</th>
           <th>沽空率</th>
           <th>5日均</th>
+          <th title="CCASS T+2 對應日沽空率">T-2沽空</th>
           <th>CCASS Δ</th>
           <th>均Δ×5</th>
+          <th title="連續結算日 (每日=2交易日)">連續(s)</th>
           <th>信號</th>
         </tr>
       </thead>
