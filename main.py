@@ -346,20 +346,30 @@ def get_ccass_southbound(date: datetime = None) -> pd.DataFrame:
         log.info("CCASS table rows: %d", len(all_rows))
         if all_rows:
             first = [td.get_text(strip=True) for td in all_rows[0].find_all(["td","th"])]
-            log.info("CCASS first row: %s", first)
+            log.info("CCASS first row: %s", first[:4])
+            if len(all_rows) > 1:
+                second = [td.get_text(strip=True) for td in all_rows[1].find_all(["td","th"])]
+                log.info("CCASS second row: %s", second[:4])
 
         rows = []
         for tr in all_rows:
             tds = [td.get_text(strip=True) for td in tr.find_all("td")]
             if len(tds) < 4:
                 continue
-            code_raw = tds[0].strip()
-            name_raw = tds[1].strip()
-            sh_raw   = tds[2].replace(",", "").strip()
-            pct_raw  = tds[3].replace("%", "").strip()
-            # Skip header-like rows
+
+            # Strip label prefixes like "Stock Code:  1" → "1"
+            def clean(s):
+                return s.split(":")[-1].strip() if ":" in s else s.strip()
+
+            code_raw = clean(tds[0]).replace(",", "")
+            name_raw = clean(tds[1])
+            sh_raw   = clean(tds[2]).replace(",", "")
+            pct_raw  = clean(tds[3]).replace("%", "").strip()
+
+            # Skip header rows
             if not code_raw.isdigit() or not sh_raw.isdigit():
                 continue
+
             rows.append({
                 "stock_code":   fmt_code(code_raw),
                 "name":         name_raw,
@@ -685,12 +695,76 @@ def classify_insight(
 
 
 # =========================
+# HISTORY BOOTSTRAP
+# =========================
+def bootstrap_history(days: int = 5):
+    """
+    On first run, fetch the last N trading days of daily quotation,
+    short selling and CCASS data to seed the history stores.
+    Skips any date already present in the stores.
+    """
+    existing_tv    = set(load_json_store(DAILY_TV_FILE).keys())
+    existing_short = set(load_json_store(SHORT_HISTORY_FILE).keys())
+    existing_ccass = set(load_json_store(CCASS_HISTORY_FILE).keys())
+
+    # Collect the last `days` trading days before today
+    target = last_trading_day(datetime.now() - timedelta(days=1))
+    dates_to_fetch = []
+    checked = 0
+    while len(dates_to_fetch) < days and checked < 30:
+        dates_to_fetch.append(target)
+        target = last_trading_day(target - timedelta(days=1))
+        checked += 1
+
+    log.info("Bootstrap: fetching history for %d dates", len(dates_to_fetch))
+
+    for d in dates_to_fetch:
+        key = d.strftime("%Y%m%d")
+
+        # Daily quotation
+        if key not in existing_tv:
+            df_q = get_daily_quotation(d)
+            if not df_q.empty:
+                save_daily_turnover(d, df_q)
+                log.info("Bootstrap daily quotation: %s (%d records)", key, len(df_q))
+            time.sleep(1)
+
+        # Short selling — use archived URL pattern ash{YYMMDD}main.htm
+        if key not in existing_short:
+            short_url = (f"https://www.hkex.com.hk/eng/stat/smstat/ssturnover/ncms/"
+                         f"ash{d.strftime('%y%m%d')}main.htm")
+            try:
+                resp = requests.get(short_url, headers=HEADERS, timeout=30)
+                if resp.status_code == 200:
+                    text = resp.content.decode("latin-1", errors="replace")
+                    df_s = _parse_short_sell_text(text)
+                    if not df_s.empty:
+                        save_short_sell(d, df_s)
+                        log.info("Bootstrap short sell: %s (%d records)", key, len(df_s))
+            except Exception as e:
+                log.warning("Bootstrap short sell failed for %s: %s", key, e)
+            time.sleep(1)
+
+        # CCASS
+        if key not in existing_ccass:
+            df_c = get_ccass_southbound(d)
+            if not df_c.empty:
+                save_ccass(d, df_c)
+                log.info("Bootstrap CCASS: %s (%d records)", key, len(df_c))
+            time.sleep(1)
+
+
+# =========================
 # MAIN ANALYSIS
 # =========================
 def run_analysis():
     today = datetime.now()
     trading_day = last_trading_day(today)
     log.info("=== Starting analysis — trading day: %s ===", trading_day.strftime("%Y-%m-%d"))
+
+    # ── 0. Bootstrap history on first run ──
+    # Only fetches dates not already in the stores — safe to call every run
+    bootstrap_history(days=5)
 
     # ── 1. Fetch daily quotation → Top 30 by turnover ──
     df_quote = get_daily_quotation(trading_day)
