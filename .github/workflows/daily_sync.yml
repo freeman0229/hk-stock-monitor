@@ -2,7 +2,7 @@ name: Daily Sync
 
 on:
   schedule:
-    - cron: '40 9 * * 1-5'  # 09:40 UTC / 17:40 HKT (Mon–Fri)
+    - cron: '0 12 * * 1-5'   # 12:00 UTC / 20:00 HKT (Mon–Fri)
   workflow_dispatch:
 
 jobs:
