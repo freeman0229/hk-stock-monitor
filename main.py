@@ -380,7 +380,7 @@ def get_ccass_southbound(date: datetime = None) -> pd.DataFrame:
         return df
 
     except Exception as e:
-        log.error("get_ccass_southbound failed (%s): %s", date_str, e)
+        log.error("get_ccass_southbound failed (%s): %s", date_str, e, exc_info=True)
         return pd.DataFrame(columns=["stock_code", "name", "shareholding", "pct_listed"])
 
 
