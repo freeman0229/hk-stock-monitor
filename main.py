@@ -486,6 +486,7 @@ def get_ccass_delta_and_avg(stock_codes: list, today_map: dict, days: int = 5):
 # DAILY TURNOVER HISTORY (needed as denominator for short ratio)
 # =========================
 DAILY_TV_FILE = "daily_turnover_history.json"
+RANK_HISTORY_FILE = "rank_history.json"
 
 def save_daily_turnover(date: datetime, df: pd.DataFrame):
     if df.empty:
@@ -496,6 +497,25 @@ def save_daily_turnover(date: datetime, df: pd.DataFrame):
     cutoff = (datetime.now() - timedelta(days=MAX_LOOKBACK)).strftime("%Y%m%d")
     store = {k: v for k, v in store.items() if k >= cutoff}
     save_json_store(DAILY_TV_FILE, store)
+
+
+def save_rank_history(date: datetime, results: list):
+    """Persist today's {code: rank} mapping for next day's comparison."""
+    store = load_json_store(RANK_HISTORY_FILE)
+    key = date.strftime("%Y%m%d")
+    store[key] = {r["code"]: r["rank"] for r in results}
+    cutoff = (datetime.now() - timedelta(days=MAX_LOOKBACK)).strftime("%Y%m%d")
+    store = {k: v for k, v in store.items() if k >= cutoff}
+    save_json_store(RANK_HISTORY_FILE, store)
+
+
+def get_prev_ranks() -> dict:
+    """Return {code: rank} from the most recent stored trading day."""
+    store = load_json_store(RANK_HISTORY_FILE)
+    if not store:
+        return {}
+    latest_key = sorted(store.keys())[-1]
+    return store[latest_key]
 
 
 # =========================
@@ -750,7 +770,10 @@ def run_analysis():
     ccass_avg5_map   = dict(zip(df_ccass_stats["stock_code"], df_ccass_stats["ccass_avg5"]))
     ccass_consec_map = dict(zip(df_ccass_stats["stock_code"], df_ccass_stats["ccass_consec"]))
 
-    # ── 5. Build result rows ──
+    # ── 5. Load yesterday's rankings for comparison ──
+    prev_ranks = get_prev_ranks()
+
+    # ── 6. Build result rows ──
     results = []
     for i, row in enumerate(df_quote.itertuples(), 1):
         code = row.stock_code
@@ -786,16 +809,23 @@ def run_analysis():
             ccass_consec    = int(ccass_consec),
         )
 
+        # ── Rank change vs previous trading day ──
+        prev_rank  = prev_ranks.get(code)          # None if not in yesterday's Top 30
+        rank_new   = prev_rank is None             # True = new entry today
+        rank_change = 0 if rank_new else prev_rank - i  # positive = moved up
+
         results.append({
             "rank":           i,
+            "rank_change":    rank_change,          # +N = up, -N = down, 0 = same
+            "rank_new":       rank_new,             # True = new to Top 30 today
             "code":           code,
             "name":           row.name,
             "stock_type":     stock_type,
             "turnover":       int(row.turnover),
             "short_ratio":    round(short_ratio, 2),
             "short_avg5":     round(short_avg5, 2),
-            "short_ratio_t2": round(short_ratio_t2, 2),  # short ratio on CCASS trade date
-            "ccass_trade_date": t2_date.strftime("%Y-%m-%d"),  # actual trade date CCASS reflects
+            "short_ratio_t2": round(short_ratio_t2, 2),
+            "ccass_trade_date": t2_date.strftime("%Y-%m-%d"),
             "ccass_pct":      round(ccass_pct, 2),
             "ccass_delta":    int(ccass_delta),
             "ccass_avg5":     int(ccass_avg5),
@@ -803,7 +833,7 @@ def run_analysis():
             "insight":        insight,
         })
 
-    # ── 6. Persist output ──
+    # ── 7. Persist output ──
     output = {
         "update_time": today.strftime("%Y-%m-%d %H:%M"),
         "stocks":      results,
@@ -812,20 +842,31 @@ def run_analysis():
         json.dump(output, f, ensure_ascii=False, indent=4)
     log.info("data.json written with %d stocks", len(results))
 
-    # ── 7. Telegram summary ──
+    # Save today's rankings for tomorrow's comparison
+    save_rank_history(today, results)
+
+    # ── 8. Telegram summary ──
     if results:
-        flagged = [s for s in results if s["insight"] != "✅ 正常"]
+        flagged  = [s for s in results if s["insight"] != "✅ 正常"]
+        new_entries = [s for s in results if s["rank_new"]]
+        big_movers  = [s for s in results if not s["rank_new"] and s["rank_change"] >= 5]
         top = results[0]
+        top_rc = f" [↑{top['rank_change']}]" if top['rank_change'] > 0 else (" [new]" if top['rank_new'] else "")
         lines = [
             f"📊 港股 AI 看板更新",
             f"時間: {output['update_time']}",
-            f"榜首: {top['name']} ({top['code']}) 成交額 {top['turnover']:,}",
-            f"異動股: {len(flagged)} 隻",
+            f"榜首: {top['name']} ({top['code']}){top_rc} 成交額 {top['turnover']:,}",
+            f"異動股: {len(flagged)} 隻 | 新進榜: {len(new_entries)} 隻",
         ]
+        if new_entries:
+            lines.append("⭐ 新進 Top30: " + "、".join(f"{s['name']}({s['code']})" for s in new_entries[:3]))
+        if big_movers:
+            lines.append("🔺 大幅上升: " + "、".join(f"{s['name']} ↑{s['rank_change']}" for s in big_movers[:3]))
         if flagged:
             lines.append("─────────────")
             for s in flagged[:5]:
-                lines.append(f"{s['insight']} {s['name']} | 沽空率 {s['short_ratio']}% | CCASS Δ {s['ccass_delta']:,}")
+                rc = f" [↑{s['rank_change']}]" if s['rank_change'] > 0 else (" [new]" if s['rank_new'] else "")
+                lines.append(f"{s['insight']} {s['name']}{rc} | 沽空率 {s['short_ratio']}% | CCASS Δ {s['ccass_delta']:,}")
         send_telegram("\n".join(lines))
 
 
