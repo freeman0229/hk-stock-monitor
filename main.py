@@ -189,33 +189,31 @@ SHORT_SELL_TODAY_URL = "https://www.hkex.com.hk/eng/stat/smstat/ssturnover/ncms/
 def _parse_short_sell_text(text: str) -> pd.DataFrame:
     """
     Parse HKEX fixed-width short selling text.
-
-    Actual format observed:
+    Actual format:
       "      1  CKH HOLDINGS           2,837,000    183,215,000"
       "    388  HKEX                   1,248,500    509,260,860"
-
-    Pattern: 4-6 spaces, code, 2 spaces, name (padded), shares(SH), turnover($)
+    Pattern: 4-8 spaces, code, 2 spaces, name (padded ~22 chars), shares, turnover
     """
-    # The name field is padded to ~22 chars, followed by the two numeric columns.
-    # Use a permissive pattern: leading spaces, digits, 2+ spaces, name, 2+ spaces, nums
-    pat = re.compile(
-        r"^\s{2,8}(\d{1,6})\s{1,3}([A-Z][A-Z0-9 \-&'./#+]{1,24}?)\s{2,}"
-        r"([\d,]+)\s+([\d,]+)\s*$",
-        re.MULTILINE
-    )
     rows = []
-    for m in pat.finditer(text):
-        code = fmt_code(m.group(1))
-        name = m.group(2).strip()
-        # Skip header-like lines
-        if name in ("NAME OF STOCK", "CODE") or not name:
-            continue
-        rows.append({
-            "stock_code":     code,
-            "name":           name,
-            "short_volume":   to_num(m.group(3)),
-            "short_turnover": to_num(m.group(4)),
-        })
+    for line in text.splitlines():
+        m = re.match(
+            r"^\s{2,8}(\d{1,6})\s{1,3}"          # code
+            r"([A-Z][A-Z0-9 \-&'./#+]{1,24}?)\s{2,}"  # name
+            r"([\d,]+)\s+([\d,]+)\s*$",            # shares  turnover
+            line
+        )
+        if m:
+            name = m.group(2).strip()
+            if name in ("NAME OF STOCK", "CODE"):
+                continue
+            rows.append({
+                "stock_code":     fmt_code(m.group(1)),
+                "name":           name,
+                "short_volume":   to_num(m.group(3)),
+                "short_turnover": to_num(m.group(4)),
+            })
+    if rows:
+        log.info("Short sell sample: %s", rows[0])
     return pd.DataFrame(rows) if rows else pd.DataFrame(
         columns=["stock_code", "name", "short_volume", "short_turnover"]
     )
@@ -333,6 +331,8 @@ def get_ccass_southbound(date: datetime = None) -> pd.DataFrame:
         resp2 = session.post(f"{base_url}?t=hk", data=payload, timeout=30)
         resp2.raise_for_status()
         soup2 = BeautifulSoup(resp2.text, "html.parser")
+        log.info("CCASS POST response: %d chars, tables: %d",
+                 len(resp2.text), len(soup2.find_all("table")))
 
         # The result table has class "table-mobile-list" or similar
         table = soup2.find("table", {"class": lambda c: c and "table" in c})
