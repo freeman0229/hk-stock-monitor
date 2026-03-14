@@ -298,6 +298,37 @@ const DATA_URL = 'data.json';
 let chart = null;
 let stocks = [];
 
+// ── CHINESE NAME LOOKUP ────────────────────────────────────────────────────
+// Maps 5-digit stock code → Chinese name.
+// Covers the typical Top 30 by HK turnover. Falls back to English if not found.
+const ZH_NAMES = {
+  "00001":"長和","00002":"中電控股","00003":"香港中華煤氣","00005":"滙豐控股",
+  "00006":"電能實業","00011":"恒生銀行","00016":"新鴻基地產","00017":"新世界發展",
+  "00019":"太古股份A","00027":"銀河娛樂","00066":"MTR鐵路","00083":"信和置業",
+  "00101":"恒隆地產","00116":"崇光百貨","00175":"吉利汽車","00241":"阿里健康",
+  "00267":"中信股份","00270":"粵海投資","00285":"必達翼電子","00288":"萬洲國際",
+  "00291":"中國太古啤酒","00293":"國泰航空","00316":"東方海外","00322":"廷基",
+  "00384":"中國燃氣","00386":"中國石化","00388":"香港交易所","00390":"中國中鐵",
+  "00700":"騰訊控股","00762":"中國聯通","00823":"領展房產基金","00857":"中國石油",
+  "00883":"中國海洋石油","00939":"建設銀行","00941":"中國移動","00960":"龍湖集團",
+  "00968":"信義光能","00992":"聯想集團","01038":"長江基建","01044":"恒安國際",
+  "01093":"石藥集團","01109":"華潤置地","01177":"中國生物製藥","01193":"華潤燃氣",
+  "01211":"比亞迪股份","01288":"農業銀行","01299":"友邦保險","01358":"中國華融",
+  "01398":"工商銀行","01810":"小米集團","01876":"百威亞太","01928":"金沙中國",
+  "02007":"碧桂園","02018":"瑞聲科技","02020":"安踏體育","02269":"藥明生物",
+  "02313":"申洲國際","02318":"中國平安","02319":"蒙牛乳業","02328":"中國財險",
+  "02382":"舜宇光學","02388":"中銀香港","02628":"中國人壽","02688":"新奧能源",
+  "02800":"盈富基金","02823":"安碩A50","02828":"恒生H股ETF","02899":"中金黃金",
+  "03033":"南方恒生科技","03690":"美團","03750":"寧德時代","03988":"中國銀行",
+  "06618":"京東健康","06690":"海爾智家","06862":"海底撈","06869":"中富通光纖",
+  "09618":"京東集團","09633":"農夫山泉","09698":"萬物雲","09888":"百度集團",
+  "09988":"阿里巴巴","09999":"網易","00568":"山東墨龍",
+};
+
+function zhName(code, fallback) {
+  return ZH_NAMES[code] || fallback;
+}
+
 // ── FETCH ──────────────────────────────────────────────────────────────────
 async function load() {
   try {
@@ -357,7 +388,7 @@ function renderKPIs(s) {
     <div class="kpi">
       <div class="label">最高沽空率</div>
       <div class="value" style="color:var(--red)">${topSh ? topSh.short_ratio : '--'}%</div>
-      <div class="sub">${topSh ? topSh.name : '--'}</div>
+      <div class="sub">${topSh ? zhName(topSh.code, topSh.name) : '--'}</div>
     </div>
     <div class="kpi">
       <div class="label">CCASS 淨增持</div>
@@ -369,7 +400,7 @@ function renderKPIs(s) {
     <div class="kpi">
       <div class="label">榜首成交額</div>
       <div class="value" style="color:var(--blue)">${fmt(s[0]?.turnover||0)}</div>
-      <div class="sub">${s[0]?.name||'--'}</div>
+      <div class="sub">${s[0] ? zhName(s[0].code, s[0].name) : '--'}</div>
     </div>
   `;
 }
@@ -390,7 +421,7 @@ function renderKPIs(s) {
       ? ` · 對應交易日 ${x.ccass_trade_date||''}` : '';
     return `
       <div class="alert-chip ${chip}">
-        ${x.insight} <strong>${x.name}</strong>
+        ${x.insight} <strong>${zhName(x.code, x.name)}</strong>
         &nbsp;[${typeLabel}]&nbsp;·&nbsp;沽空率 ${x.short_ratio}%&nbsp;·&nbsp;CCASS Δ ${fmtSh(x.ccass_delta)}${consecStr}${tradeDateStr}
       </div>
     `;
@@ -452,7 +483,7 @@ function renderChart(s) {
   };
   const labels = isMobile
     ? s.map((x, i) => `${String(i+1).padStart(2,'0')} ${x.code}${rankSuffix(x)}`)
-    : s.map((x, i) => `${String(i+1).padStart(2,'0')} ${x.code} ${x.name}${rankSuffix(x)}`);
+    : s.map((x, i) => `${String(i+1).padStart(2,'0')} ${x.code} ${zhName(x.code, x.name)}${rankSuffix(x)}`);
   const turnover = s.map(x => Math.round(x.turnover / 1e6));
   const shortR   = s.map(x => x.short_ratio);
   const shortA   = s.map(x => x.short_avg5);
@@ -551,7 +582,7 @@ function renderChart(s) {
           callbacks: {
             title: items => {
               const x = s[items[0].dataIndex];
-              return `${x.code} ${x.name}  [${x.insight}]`;
+              return `${x.code} ${zhName(x.code, x.name)}  [${x.insight}]`;
             },
             label: ctx => {
               const v = ctx.parsed.x;
@@ -654,7 +685,7 @@ function renderTable(s) {
     // On mobile: show code only in name cell, hide non-essential columns
     const nameCell = mob
       ? `${x.code}${rankTag(x)}`
-      : `${x.name}${rankTag(x)}`;
+      : `${zhName(x.code, x.name)}${rankTag(x)}`;
     return `
       <tr>
         <td class="code-cell">${x.code}</td>
