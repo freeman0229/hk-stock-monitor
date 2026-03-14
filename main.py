@@ -31,6 +31,13 @@ def is_trading_day(date: datetime = None) -> bool:
     date = date or datetime.now()
     return date.weekday() < 5 and date.date() not in HK_HOLIDAYS
 
+def last_trading_day(date: datetime = None) -> datetime:
+    """Return the most recent HK trading day on or before date."""
+    d = date or datetime.now()
+    while not is_trading_day(d):
+        d -= timedelta(days=1)
+    return d
+
 def business_days_back(date: datetime, n: int) -> datetime:
     """Return the date that is n HK business days before `date`."""
     d = date
@@ -711,10 +718,11 @@ def classify_insight(
 # =========================
 def run_analysis():
     today = datetime.now()
-    log.info("=== Starting analysis for %s ===", today.strftime("%Y-%m-%d"))
+    trading_day = last_trading_day(today)
+    log.info("=== Starting analysis — trading day: %s ===", trading_day.strftime("%Y-%m-%d"))
 
-    # ── 1. Fetch today's daily quotation → Top 30 by turnover ──
-    df_quote = get_daily_quotation(today)
+    # ── 1. Fetch daily quotation → Top 30 by turnover ──
+    df_quote = get_daily_quotation(trading_day)
     if df_quote.empty:
         msg = "⚠️ 港股看板：今日日報表未能獲取，分析中止。"
         log.error(msg)
@@ -722,13 +730,13 @@ def run_analysis():
         return
 
     # Save today's turnover for use as short ratio denominator in future runs
-    save_daily_turnover(today, df_quote)
+    save_daily_turnover(trading_day, df_quote)
     stock_codes   = df_quote["stock_code"].tolist()
     turnover_map  = dict(zip(df_quote["stock_code"], df_quote["turnover"]))
 
-    # ── 2. Fetch today's short selling ──
+    # ── 2. Fetch short selling ──
     df_short = get_short_sell_today()
-    save_short_sell(today, df_short)
+    save_short_sell(trading_day, df_short)
 
     # Build today's short ratio for the top-30 stocks
     short_map = {}
@@ -748,13 +756,13 @@ def run_analysis():
     # CCASS today reflects trades that settled 2 HK business days ago.
     # We look up the short ratio and turnover from that date so cross-signals
     # (機構增持 / 避險盤撤退) compare CCASS against data from when trades happened.
-    t2_date     = business_days_back(today, 2)
+    t2_date     = business_days_back(trading_day, 2)
     t2_date_key = t2_date.strftime("%Y%m%d")
     short_history_store = load_json_store(SHORT_HISTORY_FILE)
     log.info("T-2 date for CCASS alignment: %s", t2_date_key)
 
-    # ── 4. Fetch today's CCASS southbound ──
-    df_ccass = get_ccass_southbound(today)
+    # ── 4. Fetch CCASS southbound ──
+    df_ccass = get_ccass_southbound(trading_day)
     today_ccass_map = {}
     if not df_ccass.empty:
         today_ccass_map = dict(zip(df_ccass["stock_code"], df_ccass["shareholding"]))
@@ -762,9 +770,9 @@ def run_analysis():
     else:
         today_pct_map = {}
 
-    # Save today's CCASS *after* computing deltas (so history still has yesterday)
+    # Save CCASS *after* computing deltas (so history still has yesterday)
     df_ccass_stats = get_ccass_delta_and_avg(stock_codes, today_ccass_map, days=5)
-    save_ccass(today, df_ccass)
+    save_ccass(trading_day, df_ccass)
 
     ccass_delta_map  = dict(zip(df_ccass_stats["stock_code"], df_ccass_stats["ccass_delta"]))
     ccass_avg5_map   = dict(zip(df_ccass_stats["stock_code"], df_ccass_stats["ccass_avg5"]))
@@ -835,15 +843,15 @@ def run_analysis():
 
     # ── 7. Persist output ──
     output = {
-        "update_time": today.strftime("%Y-%m-%d %H:%M"),
+        "update_time": trading_day.strftime("%Y-%m-%d %H:%M"),
         "stocks":      results,
     }
     with open("data.json", "w", encoding="utf-8") as f:
         json.dump(output, f, ensure_ascii=False, indent=4)
     log.info("data.json written with %d stocks", len(results))
 
-    # Save today's rankings for tomorrow's comparison
-    save_rank_history(today, results)
+    # Save rankings for tomorrow's comparison
+    save_rank_history(trading_day, results)
 
     # ── 8. Telegram summary ──
     if results:
