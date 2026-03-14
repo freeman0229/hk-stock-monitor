@@ -93,12 +93,12 @@ def save_json_store(path, data):
 # =========================
 def get_daily_quotation(date: datetime = None) -> pd.DataFrame:
     """
-    Returns Top-N stocks by HKD turnover from HKEX daily quotation file (Chinese version).
-    Uses d{YY}{MM}{DD}c.htm which has a single-line-per-stock format:
-      CODE  ENG_NAME  CHI_NAME  CUR  PRV  BID  ASK  HIGH  LOW  CLOSE  SHARES  TURNOVER($)
-
+    Parses HKEX daily quotation Chinese file d{YY}{MM}{DD}c.htm.
+    Single line per stock format:
+      CODE  ENG_NAME  CHI_NAME  CUR  PRV  BID  ASK  HIGH  LOW  CLOSE  SHARES  TURNOVER
     Example:
-      "     1 CKH HOLDINGS   長和　　　　　　 HKD   59.20  ...  5,899,810  344,059,907"
+      "     1 CKH HOLDINGS   長和　　　　　　 HKD  59.20  58.20 ... 5,899,810  344,059,907"
+    Last two numbers = SHARES, TURNOVER.
     """
     date = date or datetime.now()
     date_str = date.strftime("%y%m%d")
@@ -108,47 +108,30 @@ def get_daily_quotation(date: datetime = None) -> pd.DataFrame:
         resp = requests.get(url, headers=HEADERS, timeout=30)
         resp.raise_for_status()
 
-        # Try multiple encodings — HKEX Chinese files are typically Big5
-        raw = None
-        for enc in ("big5", "cp950", "gbk", "utf-8"):
-            try:
-                raw = resp.content.decode(enc)
-                if "STOCK EXCHANGE" in raw or "股票" in raw:
-                    log.info("Daily quotation c.htm decoded with %s", enc)
-                    break
-            except (UnicodeDecodeError, LookupError):
-                continue
-        if raw is None:
-            raw = resp.content.decode("utf-8", errors="replace")
+        # Decode raw bytes as cp950 (Windows Big5) — do NOT use apparent_encoding
+        text = resp.content.decode("cp950", errors="replace")
 
-        # The file is an HTML page wrapping a <pre> block of fixed-width text
-        soup = BeautifulSoup(raw, "html.parser")
-        pre = soup.find("pre")
-        text = pre.get_text() if pre else raw
+        # Extract <pre> block
+        soup = BeautifulSoup(text, "html.parser")
+        pre  = soup.find("pre")
+        body = pre.get_text() if pre else text
 
-        log.info("Daily quotation c.htm: %d chars (pre: %s) for %s",
-                 len(raw), "yes" if pre else "no", date_str)
-        # Debug: show first 500 chars of pre block to verify format
-        log.info("PRE BLOCK SAMPLE: %s", repr(text[:500]))
+        log.info("Daily quotation c.htm: %d lines for %s", body.count("\n"), date_str)
 
-        records = []
+        records    = []
         seen_codes = set()
 
-        # Single-line pattern per stock:
-        #   optional leading * (special marker), spaces, CODE, ENG_NAME, CHI_NAME, CUR,
-        #   then 7 numeric price fields, then SHARES, then TURNOVER
-        # The last two large numbers are SHARES TRADED and TURNOVER($)
-        lines = text.split("\n")
-        for line in lines:
-            # Match: optional *, spaces, 1-5 digit code, rest
+        for line in body.splitlines():
+            # Pattern: optional *, spaces, 1-5 digit code, English name, Chinese name,
+            #          currency, 6 price fields, shares, turnover
             m = re.match(
-                r"^[\*\s]{0,4}\s{0,4}(\d{1,5})\s+"          # code
-                r"([A-Z][A-Z0-9 \-&'./#+]{1,18}?)\s{2,}"    # English name
-                r"([\u4e00-\u9fff\u3000\s]{2,20}?)\s*"       # Chinese name (optional)
-                r"(HKD|USD|CNY|EUR|GBP)\s+"                  # currency
-                r"[\d,.]+\s+[\d,.]+\s+[\d,.]+\s+"            # PRV BID ASK
-                r"[\d,.]+\s+[\d,.]+\s+[\d,.]+\s+"            # HIGH LOW CLOSE
-                r"([\d,]+)\s+([\d,]+)\s*$",                  # SHARES  TURNOVER
+                r"^[\*\s]{0,5}(\d{1,5})\s+"                      # code
+                r"([A-Z][A-Z0-9 \-&'./#+]{1,20}?)\s{2,}"         # English name
+                r"([\u4e00-\u9fff\uff01-\uffee\u3000-\u303f\s]{1,20}?)\s*"  # Chinese name
+                r"(HKD|USD|CNY|EUR|GBP)\s+"                       # currency
+                r"[\d,.]+\s+[\d,.]+\s+[\d,.]+\s+"                 # PRV BID ASK
+                r"[\d,.]+\s+[\d,.]+\s+[\d,.]+\s+"                 # HIGH LOW CLOSE
+                r"([\d,]+)\s+([\d,]+)\s*$",                       # SHARES  TURNOVER
                 line
             )
             if m:
@@ -161,18 +144,17 @@ def get_daily_quotation(date: datetime = None) -> pd.DataFrame:
                     records.append({
                         "stock_code": code,
                         "name":       name_eng,
-                        "name_chi":   name_chi if name_chi else name_eng,
+                        "name_chi":   name_chi or name_eng,
                         "turnover":   turnover,
                         "shares":     shares,
                     })
                     seen_codes.add(code)
                     if len(records) <= 3:
-                        log.info("Sample record: %s %s tv=%s", code, name_eng, turnover)
+                        log.info("Sample: %s %s %s tv=%d", code, name_eng, name_chi, int(turnover))
 
         if not records:
-            # Fallback: try English version e.htm with 10 MOST ACTIVES only
-            log.warning("c.htm parse failed for %s, trying e.htm fallback", date_str)
-            return _get_daily_quotation_fallback(date_str)
+            log.warning("Daily quotation c.htm: 0 records for %s — check encoding/format", date_str)
+            return pd.DataFrame(columns=["stock_code", "name", "name_chi", "turnover", "shares"])
 
         df = pd.DataFrame(records)
         df = df[df["turnover"] > 0]
@@ -181,46 +163,16 @@ def get_daily_quotation(date: datetime = None) -> pd.DataFrame:
         return df
 
     except requests.HTTPError as e:
-        log.warning("Daily quotation c.htm not available for %s: %s", date_str, e)
-        return _get_daily_quotation_fallback(date_str)
+        log.warning("Daily quotation not available for %s: %s", date_str, e)
+        return pd.DataFrame(columns=["stock_code", "name", "name_chi", "turnover", "shares"])
     except Exception as e:
         log.error("get_daily_quotation failed (%s): %s", date_str, e)
         return pd.DataFrame(columns=["stock_code", "name", "name_chi", "turnover", "shares"])
 
 
 def _get_daily_quotation_fallback(date_str: str) -> pd.DataFrame:
-    """Fallback: parse 10 MOST ACTIVES from English e.htm."""
-    url = f"https://www.hkex.com.hk/eng/stat/smstat/dayquot/d{date_str}e.htm"
-    try:
-        resp = requests.get(url, headers=HEADERS, timeout=30)
-        resp.raise_for_status()
-        text = resp.text
-        ma_start = text.find("10 MOST ACTIVES (DOLLARS)")
-        ma_end   = text.find("10 MOST ACTIVES (SHARES)", ma_start)
-        if ma_start == -1:
-            return pd.DataFrame(columns=["stock_code", "name", "name_chi", "turnover", "shares"])
-        ma_text = text[ma_start:ma_end]
-        pat = re.compile(
-            r"^\s{1,5}(\d{1,5})\s+([A-Z0-9][A-Z0-9 \-&'./#+]{1,18}?)\s{2,}"
-            r"(HKD|USD|CNY|EUR|GBP)\s+([\d,]+)\s+([\d,]+)",
-            re.MULTILINE
-        )
-        records = []
-        seen = set()
-        for m in pat.finditer(ma_text):
-            code = fmt_code(m.group(1))
-            if code not in seen:
-                records.append({"stock_code": code, "name": m.group(2).strip(),
-                                 "name_chi": m.group(2).strip(),
-                                 "turnover": to_num(m.group(4)), "shares": to_num(m.group(5))})
-                seen.add(code)
-        df = pd.DataFrame(records) if records else pd.DataFrame(
-            columns=["stock_code", "name", "name_chi", "turnover", "shares"])
-        log.info("Daily quotation fallback (e.htm): %d records for %s", len(df), date_str)
-        return df
-    except Exception as e:
-        log.error("Daily quotation fallback failed (%s): %s", date_str, e)
-        return pd.DataFrame(columns=["stock_code", "name", "name_chi", "turnover", "shares"])
+    """Unused placeholder."""
+    return pd.DataFrame(columns=["stock_code", "name", "name_chi", "turnover", "shares"])
 
 
 # =========================
