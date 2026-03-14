@@ -93,89 +93,66 @@ def save_json_store(path, data):
 # =========================
 def get_daily_quotation(date: datetime = None) -> pd.DataFrame:
     """
-    Returns Top-N stocks by HKD turnover from HKEX daily quotation file.
-    Columns: stock_code, name, turnover, shares
+    Returns Top-N stocks by HKD turnover from HKEX daily quotation file (Chinese version).
+    Uses d{YY}{MM}{DD}c.htm which has a single-line-per-stock format:
+      CODE  ENG_NAME  CHI_NAME  CUR  PRV  BID  ASK  HIGH  LOW  CLOSE  SHARES  TURNOVER($)
 
-    File format (fixed-width text):
-      QUOTATIONS section — two lines per stock:
-        Line 1:  "     700 TENCENT         HKD   60.00    60.05    60.65       6,493,671"
-        Line 2:  "                              60.05    60.00    59.85     390,236,735"
-      The LAST number on line 2 is the HKD turnover.
-
-      10 MOST ACTIVES (DOLLARS) — one line per stock, already sorted:
-        "  700 TENCENT         HKD      26,800,185,739         47,623,240  578.00   548.00"
-        Col order: TURNOVER($)  SHARES
+    Example:
+      "     1 CKH HOLDINGS   長和　　　　　　 HKD   59.20  ...  5,899,810  344,059,907"
     """
     date = date or datetime.now()
     date_str = date.strftime("%y%m%d")
-    url = f"https://www.hkex.com.hk/eng/stat/smstat/dayquot/d{date_str}e.htm"
+    url = f"https://www.hkex.com.hk/chi/stat/smstat/dayquot/d{date_str}c.htm"
 
     try:
         resp = requests.get(url, headers=HEADERS, timeout=30)
         resp.raise_for_status()
+        # File is Big5/GBK encoded
+        resp.encoding = resp.apparent_encoding or "big5"
         text = resp.text
+
+        log.info("Daily quotation c.htm: %d chars for %s", len(text), date_str)
 
         records = []
         seen_codes = set()
 
-        # ── Strategy 1: parse QUOTATIONS section (full list, two lines per stock) ──
-        # Locate the section between "QUOTATIONS" header and next dashed separator
-        quot_start = text.find("\n                                  QUOTATIONS\n")
-        quot_end   = text.find("---------------", quot_start + 10) if quot_start != -1 else -1
-
-        if quot_start != -1 and quot_end != -1:
-            section = text[quot_start:quot_end]
-            lines = section.split("\n")
-            i = 0
-            while i < len(lines):
-                line = lines[i]
-                # Line 1 pattern: 4-6 spaces, code (1-5 digits), 1+ spaces, NAME, spaces, HKD/USD/CNY
-                m = re.match(
-                    r"^\s{3,7}(\d{1,5})\s+([A-Z0-9][A-Z0-9 \-&'./#+]{1,18}?)\s{2,}"
-                    r"(HKD|USD|CNY|EUR|GBP)\s+([\d,.]+)\s+([\d,.]+)\s+([\d,.]+)\s+([\d,]+)\s*$",
-                    line
-                )
-                if m and i + 1 < len(lines):
-                    code  = fmt_code(m.group(1))
-                    name  = m.group(2).strip()
-                    # Line 2: continuation — last number is turnover ($)
-                    next_line = lines[i + 1]
-                    nums = re.findall(r"[\d,]{3,}", next_line)
-                    if nums and code not in seen_codes:
-                        turnover = to_num(nums[-1])
-                        shares   = to_num(m.group(7))
-                        if turnover > 0:
-                            records.append({"stock_code": code, "name": name,
-                                            "turnover": turnover, "shares": shares})
-                            seen_codes.add(code)
-                    i += 2
-                    continue
-                i += 1
-
-        # ── Strategy 2: parse 10 MOST ACTIVES (DOLLARS) as supplement/fallback ──
-        ma_start = text.find("10 MOST ACTIVES (DOLLARS)")
-        ma_end   = text.find("10 MOST ACTIVES (SHARES)", ma_start)
-        if ma_start != -1 and ma_end != -1:
-            ma_text = text[ma_start:ma_end]
-            # Format: CODE  NAME  CUR  TURNOVER($)  SHARES  HIGH  LOW
-            pat = re.compile(
-                r"^\s{1,5}(\d{1,5})\s+([A-Z0-9][A-Z0-9 \-&'./#+]{1,18}?)\s{2,}"
-                r"(HKD|USD|CNY|EUR|GBP)\s+([\d,]+)\s+([\d,]+)",
-                re.MULTILINE
+        # Single-line pattern per stock:
+        #   optional leading * (special marker), spaces, CODE, ENG_NAME, CHI_NAME, CUR,
+        #   then 7 numeric price fields, then SHARES, then TURNOVER
+        # The last two large numbers are SHARES TRADED and TURNOVER($)
+        lines = text.split("\n")
+        for line in lines:
+            # Match: optional *, spaces, 1-5 digit code, rest
+            m = re.match(
+                r"^[\*\s]{0,4}\s{0,4}(\d{1,5})\s+"          # code
+                r"([A-Z][A-Z0-9 \-&'./#+]{1,18}?)\s{2,}"    # English name
+                r"([\u4e00-\u9fff\u3000\s]{2,20}?)\s*"       # Chinese name (optional)
+                r"(HKD|USD|CNY|EUR|GBP)\s+"                  # currency
+                r"[\d,.]+\s+[\d,.]+\s+[\d,.]+\s+"            # PRV BID ASK
+                r"[\d,.]+\s+[\d,.]+\s+[\d,.]+\s+"            # HIGH LOW CLOSE
+                r"([\d,]+)\s+([\d,]+)\s*$",                  # SHARES  TURNOVER
+                line
             )
-            for m in pat.finditer(ma_text):
+            if m:
                 code     = fmt_code(m.group(1))
-                name     = m.group(2).strip()
-                turnover = to_num(m.group(4))   # TURNOVER($) comes first
+                name_eng = m.group(2).strip()
+                name_chi = m.group(3).strip().replace("\u3000", "").strip()
                 shares   = to_num(m.group(5))
+                turnover = to_num(m.group(6))
                 if code not in seen_codes and turnover > 0:
-                    records.append({"stock_code": code, "name": name,
-                                    "turnover": turnover, "shares": shares})
+                    records.append({
+                        "stock_code": code,
+                        "name":       name_eng,
+                        "name_chi":   name_chi if name_chi else name_eng,
+                        "turnover":   turnover,
+                        "shares":     shares,
+                    })
                     seen_codes.add(code)
 
         if not records:
-            log.warning("Daily quotation: no records parsed for %s", date_str)
-            return pd.DataFrame(columns=["stock_code", "name", "turnover", "shares"])
+            # Fallback: try English version e.htm with 10 MOST ACTIVES only
+            log.warning("c.htm parse failed for %s, trying e.htm fallback", date_str)
+            return _get_daily_quotation_fallback(date_str)
 
         df = pd.DataFrame(records)
         df = df[df["turnover"] > 0]
@@ -184,11 +161,46 @@ def get_daily_quotation(date: datetime = None) -> pd.DataFrame:
         return df
 
     except requests.HTTPError as e:
-        log.warning("Daily quotation not available for %s: %s", date_str, e)
-        return pd.DataFrame(columns=["stock_code", "name", "turnover", "shares"])
+        log.warning("Daily quotation c.htm not available for %s: %s", date_str, e)
+        return _get_daily_quotation_fallback(date_str)
     except Exception as e:
         log.error("get_daily_quotation failed (%s): %s", date_str, e)
-        return pd.DataFrame(columns=["stock_code", "name", "turnover", "shares"])
+        return pd.DataFrame(columns=["stock_code", "name", "name_chi", "turnover", "shares"])
+
+
+def _get_daily_quotation_fallback(date_str: str) -> pd.DataFrame:
+    """Fallback: parse 10 MOST ACTIVES from English e.htm."""
+    url = f"https://www.hkex.com.hk/eng/stat/smstat/dayquot/d{date_str}e.htm"
+    try:
+        resp = requests.get(url, headers=HEADERS, timeout=30)
+        resp.raise_for_status()
+        text = resp.text
+        ma_start = text.find("10 MOST ACTIVES (DOLLARS)")
+        ma_end   = text.find("10 MOST ACTIVES (SHARES)", ma_start)
+        if ma_start == -1:
+            return pd.DataFrame(columns=["stock_code", "name", "name_chi", "turnover", "shares"])
+        ma_text = text[ma_start:ma_end]
+        pat = re.compile(
+            r"^\s{1,5}(\d{1,5})\s+([A-Z0-9][A-Z0-9 \-&'./#+]{1,18}?)\s{2,}"
+            r"(HKD|USD|CNY|EUR|GBP)\s+([\d,]+)\s+([\d,]+)",
+            re.MULTILINE
+        )
+        records = []
+        seen = set()
+        for m in pat.finditer(ma_text):
+            code = fmt_code(m.group(1))
+            if code not in seen:
+                records.append({"stock_code": code, "name": m.group(2).strip(),
+                                 "name_chi": m.group(2).strip(),
+                                 "turnover": to_num(m.group(4)), "shares": to_num(m.group(5))})
+                seen.add(code)
+        df = pd.DataFrame(records) if records else pd.DataFrame(
+            columns=["stock_code", "name", "name_chi", "turnover", "shares"])
+        log.info("Daily quotation fallback (e.htm): %d records for %s", len(df), date_str)
+        return df
+    except Exception as e:
+        log.error("Daily quotation fallback failed (%s): %s", date_str, e)
+        return pd.DataFrame(columns=["stock_code", "name", "name_chi", "turnover", "shares"])
 
 
 # =========================
@@ -797,10 +809,11 @@ def run_analysis():
 
         results.append({
             "rank":           i,
-            "rank_change":    rank_change,          # +N = up, -N = down, 0 = same
-            "rank_new":       rank_new,             # True = new to Top 30 today
+            "rank_change":    rank_change,
+            "rank_new":       rank_new,
             "code":           code,
             "name":           row.name,
+            "name_chi":       getattr(row, 'name_chi', row.name),
             "stock_type":     stock_type,
             "turnover":       int(row.turnover),
             "short_ratio":    round(short_ratio, 2),
