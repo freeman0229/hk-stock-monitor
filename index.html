@@ -140,6 +140,14 @@
   .badge-blue   { background:var(--blue-dim);  color:#7db8ff; }
   .badge-green  { background:var(--green-dim); color:#5fffb8; }
 
+  /* rank change badges */
+  .rank-new  { background:#BA751733; color:#EF9F27; border:1px solid #BA751766;
+               font-size:10px; font-weight:600; padding:1px 5px; border-radius:4px; margin-left:4px; white-space:nowrap; }
+  .rank-up   { background:#E24B4A22; color:#F09595; border:1px solid #E24B4A55;
+               font-size:10px; font-weight:600; padding:1px 5px; border-radius:4px; margin-left:4px; white-space:nowrap; }
+  .rank-up.big { color:#E24B4A; border-color:#E24B4A99; background:#E24B4A33; }
+  .rank-down { font-size:10px; color:var(--dim); margin-left:4px; white-space:nowrap; }
+
   /* delta colouring */
   .pos { color:var(--green); }
   .neg { color:var(--red); }
@@ -175,7 +183,33 @@
     .kpi-row { grid-template-columns:repeat(3,1fr); }
   }
   @media(max-width:600px) {
+    body { padding:12px 12px 60px; }
     .kpi-row { grid-template-columns:repeat(2,1fr); }
+    .kpi { padding:10px 12px; }
+    .kpi .value { font-size:20px; }
+    .logo-text h1 { font-size:15px; }
+    .logo-text p  { display:none; }
+
+    /* Alert chips: full width on mobile */
+    .alert-chip { font-size:11px; padding:8px 10px; width:100%; }
+
+    /* Chart: horizontal scroll container on mobile */
+    .chart-scroll-outer {
+      overflow-x:auto;
+      -webkit-overflow-scrolling:touch;
+    }
+
+    /* Table: hide non-essential columns on mobile */
+    .tbl-wrap { max-height:none; }
+    table { table-layout:fixed; min-width:420px; }
+    .col-hide-mobile { display:none; }
+
+    /* Sticky header already works — ensure z-index is above scroll */
+    thead th { font-size:9px; padding:8px 7px; }
+    td        { padding:7px 7px; font-size:11px; }
+
+    /* Touch-friendly: larger tap targets */
+    .badge { padding:4px 8px; font-size:10px; }
   }
 </style>
 </head>
@@ -213,8 +247,10 @@
         <h2><span class="dot"></span>Top 30 成交股 — 綜合對比</h2>
       </div>
       <div class="legend-row" id="legend-row"></div>
-      <div class="chart-wrap" id="chart-wrap">
-        <div class="loader"><div class="spinner"></div></div>
+      <div class="chart-scroll-outer">
+        <div class="chart-wrap" id="chart-wrap">
+          <div class="loader"><div class="spinner"></div></div>
+        </div>
       </div>
     </div>
 
@@ -373,11 +409,24 @@ function renderChart(s) {
   const wrap   = document.getElementById('chart-wrap');
   const legRow = document.getElementById('legend-row');
 
-  const h = s.length * 26 + 80;
+  const isMobile = window.innerWidth < 600;
+  const rowH  = isMobile ? 22 : 26;
+  const minW  = isMobile ? 560 : 0;   // force horizontal scroll on small screens
+  const h = s.length * rowH + 80;
   wrap.style.height = h + 'px';
+  if (minW) wrap.style.minWidth = minW + 'px';
   wrap.innerHTML = '<canvas id="mainChart"></canvas>';
 
-  const labels   = s.map((x, i) => `${String(i+1).padStart(2,'0')} ${x.code} ${x.name}`);
+  const rankSuffix = x => {
+    if (x.rank_new)          return ' ★';
+    if (x.rank_change >= 10) return ` ↑${x.rank_change}`;
+    if (x.rank_change >= 3)  return ` ↑${x.rank_change}`;
+    if (x.rank_change <= -3) return ` ↓${Math.abs(x.rank_change)}`;
+    return '';
+  };
+  const labels = isMobile
+    ? s.map((x, i) => `${String(i+1).padStart(2,'0')} ${x.code}${rankSuffix(x)}`)
+    : s.map((x, i) => `${String(i+1).padStart(2,'0')} ${x.code} ${x.name}${rankSuffix(x)}`);
   const turnover = s.map(x => Math.round(x.turnover / 1e6));
   const shortR   = s.map(x => x.short_ratio);
   const shortA   = s.map(x => x.short_avg5);
@@ -553,7 +602,16 @@ function shortClass(x) {
   return '';
 }
 
+function rankTag(x) {
+  if (x.rank_new)          return `<span class="rank-new">new</span>`;
+  if (x.rank_change >= 10) return `<span class="rank-up big">↑${x.rank_change}</span>`;
+  if (x.rank_change >= 3)  return `<span class="rank-up">↑${x.rank_change}</span>`;
+  if (x.rank_change <= -3) return `<span class="rank-down">↓${Math.abs(x.rank_change)}</span>`;
+  return '';
+}
+
 function renderTable(s) {
+  const mob = window.innerWidth < 600;
   const rows = s.map(x => {
     const dc  = deltaClass(x.ccass_delta);
     const ac  = deltaClass(x.ccass_avg5);
@@ -567,18 +625,22 @@ function renderTable(s) {
     const consec    = x.ccass_consec || 0;
     const consecStr = consec === 0 ? '<span style="color:var(--dim)">—</span>'
       : `<span class="${consec > 0 ? 'pos' : 'neg'}" title="CCASS T+2: 反映 ${x.ccass_trade_date||''} 的交易">${consec > 0 ? '+' : ''}${consec}s</span>`;
+    // On mobile: show code only in name cell, hide non-essential columns
+    const nameCell = mob
+      ? `${x.code}${rankTag(x)}`
+      : `${x.name}${rankTag(x)}`;
     return `
       <tr>
         <td class="code-cell">${x.code}</td>
-        <td>${x.name}</td>
-        <td><span style="font-size:10px;padding:2px 6px;border-radius:4px;${typeStyle}">${typeLabel}</span></td>
+        <td style="max-width:${mob?'80px':'140px'};overflow:hidden;text-overflow:ellipsis">${nameCell}</td>
+        <td${mob ? ' class="col-hide-mobile"' : ''}><span style="font-size:10px;padding:2px 6px;border-radius:4px;${typeStyle}">${typeLabel}</span></td>
         <td class="mono">${tv}</td>
         <td class="mono ${sc}">${x.short_ratio.toFixed(1)}%</td>
-        <td class="mono" style="color:var(--dim)">${x.short_avg5.toFixed(1)}%</td>
-        <td class="mono" style="color:var(--dim)" title="T-2 沽空率 (${x.ccass_trade_date||''})">${x.short_ratio_t2 != null ? x.short_ratio_t2.toFixed(1)+'%' : '—'}</td>
+        <td class="mono col-hide-mobile" style="color:var(--dim)">${x.short_avg5.toFixed(1)}%</td>
+        <td class="mono col-hide-mobile" title="T-2 沽空率 (${x.ccass_trade_date||''})">${x.short_ratio_t2 != null ? x.short_ratio_t2.toFixed(1)+'%' : '—'}</td>
         <td class="mono ${dc}">${fmtSh(x.ccass_delta)}</td>
-        <td class="mono ${ac}">${fmtSh(x.ccass_avg5)}</td>
-        <td class="mono">${consecStr}</td>
+        <td class="mono col-hide-mobile ${ac}">${fmtSh(x.ccass_avg5)}</td>
+        <td class="mono col-hide-mobile">${consecStr}</td>
         <td><span class="badge ${badge}">${x.insight}</span></td>
       </tr>
     `;
@@ -590,14 +652,14 @@ function renderTable(s) {
         <tr>
           <th>代號</th>
           <th>名稱</th>
-          <th>類型</th>
+          <th class="col-hide-mobile">類型</th>
           <th>成交額</th>
           <th>沽空率</th>
-          <th>5日均</th>
-          <th title="CCASS T+2 對應日沽空率">T-2沽空</th>
+          <th class="col-hide-mobile">5日均</th>
+          <th class="col-hide-mobile" title="CCASS T+2 對應日沽空率">T-2沽空</th>
           <th>CCASS Δ</th>
-          <th>均Δ×5</th>
-          <th title="連續結算日 (每日=2交易日)">連續(s)</th>
+          <th class="col-hide-mobile">均Δ×5</th>
+          <th class="col-hide-mobile" title="連續結算日 (每日=2交易日)">連續(s)</th>
           <th>信號</th>
         </tr>
       </thead>
