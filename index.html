@@ -405,7 +405,8 @@ function renderKPIs(s) {
   `;
 }
 
-// ── ALERTS ─────────────────────────────────────────────────────────────────function renderAlerts(s) {
+// ── ALERTS ─────────────────────────────────────────────────────────────────
+function renderAlerts(s) {
   const box = document.getElementById('alerts');
   const flagged = s.filter(x => x.insight !== '✅ 正常');
   if (!flagged.length) {
