@@ -37,5 +37,7 @@ jobs:
         run: |
           git config --global user.name "Bot"
           git config --global user.email "bot@github.com"
-          git add data.json short_history.json ccass_history.json daily_turnover_history.json rank_history.json
+          for f in data.json short_history.json ccass_history.json daily_turnover_history.json rank_history.json; do
+            [ -f "$f" ] && git add "$f"
+          done
           git diff --staged --quiet || (git commit -m "Update data: $(date +'%Y-%m-%d %H:%M')" && git push)
