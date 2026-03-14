@@ -224,7 +224,6 @@ def get_short_sell_today() -> pd.DataFrame:
         resp.raise_for_status()
         # Use latin-1 which maps bytes 1:1 — the file is ASCII-compatible fixed-width
         text = resp.content.decode("latin-1", errors="replace")
-        log.info("Short sell raw: %d chars, sample: %s", len(text), repr(text[200:350]))
         df = _parse_short_sell_text(text)
         log.info("Short sell today: %d records", len(df))
         return df
@@ -344,12 +343,6 @@ def get_ccass_southbound(date: datetime = None) -> pd.DataFrame:
 
         all_rows = table.find_all("tr")
         log.info("CCASS table rows: %d", len(all_rows))
-        if all_rows:
-            first = [td.get_text(strip=True) for td in all_rows[0].find_all(["td","th"])]
-            log.info("CCASS first row: %s", first[:4])
-            if len(all_rows) > 1:
-                second = [td.get_text(strip=True) for td in all_rows[1].find_all(["td","th"])]
-                log.info("CCASS second row: %s", second[:4])
 
         rows = []
         for tr in all_rows:
@@ -729,21 +722,8 @@ def bootstrap_history(days: int = 5):
                 log.info("Bootstrap daily quotation: %s (%d records)", key, len(df_q))
             time.sleep(1)
 
-        # Short selling — use archived URL pattern ash{YYMMDD}main.htm
-        if key not in existing_short:
-            short_url = (f"https://www.hkex.com.hk/eng/stat/smstat/ssturnover/ncms/"
-                         f"ash{d.strftime('%y%m%d')}main.htm")
-            try:
-                resp = requests.get(short_url, headers=HEADERS, timeout=30)
-                if resp.status_code == 200:
-                    text = resp.content.decode("latin-1", errors="replace")
-                    df_s = _parse_short_sell_text(text)
-                    if not df_s.empty:
-                        save_short_sell(d, df_s)
-                        log.info("Bootstrap short sell: %s (%d records)", key, len(df_s))
-            except Exception as e:
-                log.warning("Bootstrap short sell failed for %s: %s", key, e)
-            time.sleep(1)
+        # Short selling — archived files not publicly available, skip
+        # ashtmain.htm only has today's data, no historical archive
 
         # CCASS
         if key not in existing_ccass:
@@ -901,26 +881,26 @@ def run_analysis():
 
     # ── 8. Telegram summary ──
     if results:
-        flagged  = [s for s in results if s["insight"] != "✅ 正常"]
+        flagged     = [s for s in results if s["insight"] != "✅ 正常"]
         new_entries = [s for s in results if s["rank_new"]]
         big_movers  = [s for s in results if not s["rank_new"] and s["rank_change"] >= 5]
         top = results[0]
         top_rc = f" [↑{top['rank_change']}]" if top['rank_change'] > 0 else (" [new]" if top['rank_new'] else "")
         lines = [
-            f"📊 港股 AI 看板更新",
+            f"📊 港股 Top 30 策略報告",
             f"時間: {output['update_time']}",
-            f"榜首: {top['name']} ({top['code']}){top_rc} 成交額 {top['turnover']:,}",
+            f"榜首: {top['name_chi']} ({top['code']}){top_rc} 成交額 {top['turnover']:,}",
             f"異動股: {len(flagged)} 隻 | 新進榜: {len(new_entries)} 隻",
         ]
         if new_entries:
-            lines.append("⭐ 新進 Top30: " + "、".join(f"{s['name']}({s['code']})" for s in new_entries[:3]))
+            lines.append("⭐ 新進 Top30: " + "、".join(f"{s['name_chi']}({s['code']})" for s in new_entries[:3]))
         if big_movers:
-            lines.append("🔺 大幅上升: " + "、".join(f"{s['name']} ↑{s['rank_change']}" for s in big_movers[:3]))
+            lines.append("🔺 大幅上升: " + "、".join(f"{s['name_chi']} ↑{s['rank_change']}" for s in big_movers[:3]))
         if flagged:
             lines.append("─────────────")
             for s in flagged[:5]:
                 rc = f" [↑{s['rank_change']}]" if s['rank_change'] > 0 else (" [new]" if s['rank_new'] else "")
-                lines.append(f"{s['insight']} {s['name']}{rc} | 沽空率 {s['short_ratio']}% | CCASS Δ {s['ccass_delta']:,}")
+                lines.append(f"{s['insight']} {s['name_chi']}({s['code']}){rc} | 沽空率 {s['short_ratio']}% | CCASS Δ {s['ccass_delta']:,}")
         send_telegram("\n".join(lines))
 
 
