@@ -1,10 +1,10 @@
 {
-    "update_time": "2026-03-13 21:43",
+    "update_time": "2026-03-13 21:53",
     "stocks": [
         {
             "rank": 1,
             "rank_change": 0,
-            "rank_new": true,
+            "rank_new": false,
             "code": "02800",
             "name": "TRACKER FUND",
             "stock_type": "etf",
@@ -22,7 +22,7 @@
         {
             "rank": 2,
             "rank_change": 0,
-            "rank_new": true,
+            "rank_new": false,
             "code": "03033",
             "name": "CSOP HS TECH",
             "stock_type": "etf",
@@ -40,7 +40,7 @@
         {
             "rank": 3,
             "rank_change": 0,
-            "rank_new": true,
+            "rank_new": false,
             "code": "00700",
             "name": "TENCENT",
             "stock_type": "bluechip",
@@ -58,7 +58,7 @@
         {
             "rank": 4,
             "rank_change": 0,
-            "rank_new": true,
+            "rank_new": false,
             "code": "02828",
             "name": "HSCEI ETF",
             "stock_type": "etf",
@@ -76,7 +76,7 @@
         {
             "rank": 5,
             "rank_change": 0,
-            "rank_new": true,
+            "rank_new": false,
             "code": "09988",
             "name": "BABA-W",
             "stock_type": "bluechip",
@@ -94,7 +94,7 @@
         {
             "rank": 6,
             "rank_change": 0,
-            "rank_new": true,
+            "rank_new": false,
             "code": "00883",
             "name": "CNOOC",
             "stock_type": "stable",
@@ -112,7 +112,7 @@
         {
             "rank": 7,
             "rank_change": 0,
-            "rank_new": true,
+            "rank_new": false,
             "code": "00005",
             "name": "HSBC HOLDINGS",
             "stock_type": "bluechip",
@@ -130,7 +130,7 @@
         {
             "rank": 8,
             "rank_change": 0,
-            "rank_new": true,
+            "rank_new": false,
             "code": "01428",
             "name": "BRIGHT SMART",
             "stock_type": "general",
@@ -148,7 +148,7 @@
         {
             "rank": 9,
             "rank_change": 0,
-            "rank_new": true,
+            "rank_new": false,
             "code": "01810",
             "name": "XIAOMI-W",
             "stock_type": "bluechip",
