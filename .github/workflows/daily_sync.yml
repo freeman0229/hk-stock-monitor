@@ -2,37 +2,40 @@ name: Daily Sync
 
 on:
   schedule:
-    - cron: '40 9 * * 1-5' # 17:40 HKT
+    - cron: '40 9 * * 1-5'  # 09:40 UTC / 17:40 HKT (Mon–Fri)
   workflow_dispatch:
 
 jobs:
   run:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       contents: write
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - run: |
-          python -m pip install --upgrade pip
-          pip install --upgrade -r requirements.txt
-      - name: Download SFC CSV
+          cache: 'pip'
+
+      - name: Install dependencies
         run: |
-          DATE=$(date +'%Y%m%d')
-          curl -o sfc_short_$DATE.csv "https://www.sfc.hk/edistributionWeb/api/short_selling?date=$DATE"
-      - name: Run Analysis
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run analysis
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           CHAT_ID: ${{ secrets.CHAT_ID }}
         run: python main.py
+
       - name: Commit updated data
         run: |
           git config --global user.name "Bot"
           git config --global user.email "bot@github.com"
-          git add data.json
-          git commit -m "Update Data: $(date +'%Y-%m-%d %H:%M')" || exit 0
-          git push
+          git add data.json short_history.json ccass_history.json daily_turnover_history.json
+          git diff --staged --quiet || (git commit -m "Update data: $(date +'%Y-%m-%d %H:%M')" && git push)
