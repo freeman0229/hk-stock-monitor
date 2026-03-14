@@ -879,7 +879,4 @@ def run_analysis():
 
 
 if __name__ == "__main__":
-    if not is_trading_day():
-        log.info("Not a HK trading day — skipping.")
-    else:
-        run_analysis()
+    run_analysis()
