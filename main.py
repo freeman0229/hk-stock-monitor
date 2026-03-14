@@ -331,30 +331,49 @@ def get_ccass_southbound(date: datetime = None) -> pd.DataFrame:
         resp2 = session.post(f"{base_url}?t=hk", data=payload, timeout=30)
         resp2.raise_for_status()
         soup2 = BeautifulSoup(resp2.text, "html.parser")
-        log.info("CCASS POST response: %d chars, tables: %d",
-                 len(resp2.text), len(soup2.find_all("table")))
+        # Remove debug table logging now that we know tables exist
+        tables = soup2.find_all("table")
 
-        # The result table has class "table-mobile-list" or similar
-        table = soup2.find("table", {"class": lambda c: c and "table" in c})
-        if table is None:
-            tables = soup2.find_all("table")
-            table = next((t for t in tables if len(t.find_all("tr")) > 5), None)
+        # Find the data table — it's the one with the most rows
+        table = max(tables, key=lambda t: len(t.find_all("tr"))) if tables else None
 
         if table is None:
             log.warning("CCASS: no table found for %s", date_str)
             return pd.DataFrame(columns=["stock_code", "name", "shareholding", "pct_listed"])
 
         rows = []
-        for tr in table.find_all("tr")[1:]:
-            tds = [td.get_text(strip=True) for td in tr.find_all("td")]
-            if len(tds) >= 4:
-                shareholding_str = tds[2].replace(",", "")
+        for tr in table.find_all("tr"):
+            tds = [td.get_text(strip=True) for td in tr.find_all(["td", "th"])]
+            # Skip header rows
+            if not tds or any(h in tds[0] for h in ("股份代號", "Stock", "代號")):
+                continue
+            # Each row: code, name, shareholding, pct
+            # Some rows may have label prefixes like "股份代號:  1"
+            cleaned = []
+            for td in tds:
+                # Strip label prefix e.g. "股份代號:  1" → "1"
+                if ":" in td:
+                    td = td.split(":")[-1].strip()
+                cleaned.append(td)
+
+            if len(cleaned) >= 3:
+                code_str  = cleaned[0].replace(",", "").strip()
+                name_str  = cleaned[1].strip()
+                sh_str    = cleaned[2].replace(",", "").strip()
+                pct_str   = cleaned[3].replace("%", "").strip() if len(cleaned) >= 4 else "0"
+
+                if not code_str.isdigit() or not sh_str.isdigit():
+                    continue
+
                 rows.append({
-                    "stock_code":  fmt_code(tds[0]),
-                    "name":        tds[1],
-                    "shareholding": int(shareholding_str) if shareholding_str.isdigit() else 0,
-                    "pct_listed":  float(tds[3].replace("%", "").strip() or 0),
+                    "stock_code":   fmt_code(code_str),
+                    "name":         name_str,
+                    "shareholding": int(sh_str),
+                    "pct_listed":   float(pct_str) if pct_str else 0.0,
                 })
+
+        if rows:
+            log.info("CCASS sample: %s", rows[0])
 
         df = pd.DataFrame(rows)
         log.info("CCASS southbound: %d records for %s", len(df), date_str)
