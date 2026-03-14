@@ -107,11 +107,16 @@ def get_daily_quotation(date: datetime = None) -> pd.DataFrame:
     try:
         resp = requests.get(url, headers=HEADERS, timeout=30)
         resp.raise_for_status()
-        # File is Big5/GBK encoded
         resp.encoding = resp.apparent_encoding or "big5"
-        text = resp.text
+        raw = resp.text
 
-        log.info("Daily quotation c.htm: %d chars for %s", len(text), date_str)
+        # The file is an HTML page wrapping a <pre> block of fixed-width text
+        soup = BeautifulSoup(raw, "html.parser")
+        pre = soup.find("pre")
+        text = pre.get_text() if pre else raw
+
+        log.info("Daily quotation c.htm: %d chars (pre: %s) for %s",
+                 len(raw), "yes" if pre else "no", date_str)
 
         records = []
         seen_codes = set()
@@ -148,6 +153,8 @@ def get_daily_quotation(date: datetime = None) -> pd.DataFrame:
                         "shares":     shares,
                     })
                     seen_codes.add(code)
+                    if len(records) <= 3:
+                        log.info("Sample record: %s %s tv=%s", code, name_eng, turnover)
 
         if not records:
             # Fallback: try English version e.htm with 10 MOST ACTIVES only
