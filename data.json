@@ -1,9 +1,9 @@
 {
-    "update_time": "2026-03-13 22:32",
+    "update_time": "2026-03-13 22:44",
     "stocks": [
         {
             "rank": 1,
-            "rank_change": 6,
+            "rank_change": 0,
             "rank_new": false,
             "code": "00005",
             "name": "HSBC HOLDINGS",
@@ -23,7 +23,7 @@
         {
             "rank": 2,
             "rank_change": 0,
-            "rank_new": true,
+            "rank_new": false,
             "code": "00020",
             "name": "SENSETIME-W",
             "name_chi": "商湯－Ｗ",
@@ -42,7 +42,7 @@
         {
             "rank": 3,
             "rank_change": 0,
-            "rank_new": true,
+            "rank_new": false,
             "code": "00100",
             "name": "MINIMAX-WP",
             "name_chi": "MINIMAX-WP",
@@ -61,7 +61,7 @@
         {
             "rank": 4,
             "rank_change": 0,
-            "rank_new": true,
+            "rank_new": false,
             "code": "00016",
             "name": "SHK PPT",
             "name_chi": "新鴻基地產",
@@ -80,7 +80,7 @@
         {
             "rank": 5,
             "rank_change": 0,
-            "rank_new": true,
+            "rank_new": false,
             "code": "00175",
             "name": "GEELY AUTO",
             "name_chi": "吉利汽車",
@@ -99,7 +99,7 @@
         {
             "rank": 6,
             "rank_change": 0,
-            "rank_new": true,
+            "rank_new": false,
             "code": "00136",
             "name": "CHINA RUYI",
             "name_chi": "中國儒意",
@@ -118,7 +118,7 @@
         {
             "rank": 7,
             "rank_change": 0,
-            "rank_new": true,
+            "rank_new": false,
             "code": "00027",
             "name": "GALAXY ENT",
             "name_chi": "銀河娛樂",
@@ -137,7 +137,7 @@
         {
             "rank": 8,
             "rank_change": 0,
-            "rank_new": true,
+            "rank_new": false,
             "code": "00001",
             "name": "CKH HOLDINGS",
             "name_chi": "長和",
@@ -156,7 +156,7 @@
         {
             "rank": 9,
             "rank_change": 0,
-            "rank_new": true,
+            "rank_new": false,
             "code": "00241",
             "name": "ALI HEALTH",
             "name_chi": "阿里健康",
@@ -175,7 +175,7 @@
         {
             "rank": 10,
             "rank_change": 0,
-            "rank_new": true,
+            "rank_new": false,
             "code": "00187",
             "name": "JINGCHENG MAC",
             "name_chi": "京城機電股份",
@@ -194,7 +194,7 @@
         {
             "rank": 11,
             "rank_change": 0,
-            "rank_new": true,
+            "rank_new": false,
             "code": "00002",
             "name": "CLP HOLDINGS",
             "name_chi": "中電控股",
@@ -213,7 +213,7 @@
         {
             "rank": 12,
             "rank_change": 0,
-            "rank_new": true,
+            "rank_new": false,
             "code": "00189",
             "name": "DONGYUE GROUP",
             "name_chi": "東岳集團",
@@ -232,7 +232,7 @@
         {
             "rank": 13,
             "rank_change": 0,
-            "rank_new": true,
+            "rank_new": false,
             "code": "00168",
             "name": "TSINGTAO BREW",
             "name_chi": "青島啤酒股份",
@@ -251,7 +251,7 @@
         {
             "rank": 14,
             "rank_change": 0,
-            "rank_new": true,
+            "rank_new": false,
             "code": "00006",
             "name": "POWER ASSETS",
             "name_chi": "電能實業",
@@ -270,7 +270,7 @@
         {
             "rank": 15,
             "rank_change": 0,
-            "rank_new": true,
+            "rank_new": false,
             "code": "00038",
             "name": "FIRST TRACTOR",
             "name_chi": "第一拖拉機股份",
@@ -289,7 +289,7 @@
         {
             "rank": 16,
             "rank_change": 0,
-            "rank_new": true,
+            "rank_new": false,
             "code": "00135",
             "name": "KUNLUN ENERGY",
             "name_chi": "昆侖能源",
@@ -308,7 +308,7 @@
         {
             "rank": 17,
             "rank_change": 0,
-            "rank_new": true,
+            "rank_new": false,
             "code": "00083",
             "name": "SINO LAND",
             "name_chi": "信和置業",
@@ -327,7 +327,7 @@
         {
             "rank": 18,
             "rank_change": 0,
-            "rank_new": true,
+            "rank_new": false,
             "code": "00013",
             "name": "HUTCHMED",
             "name_chi": "和黃醫藥",
@@ -346,7 +346,7 @@
         {
             "rank": 19,
             "rank_change": 0,
-            "rank_new": true,
+            "rank_new": false,
             "code": "00101",
             "name": "HANG LUNG PPT",
             "name_chi": "恒隆地產",
@@ -365,7 +365,7 @@
         {
             "rank": 20,
             "rank_change": 0,
-            "rank_new": true,
+            "rank_new": false,
             "code": "00017",
             "name": "NEW WORLD DEV",
             "name_chi": "新世界發展",
@@ -384,7 +384,7 @@
         {
             "rank": 21,
             "rank_change": 0,
-            "rank_new": true,
+            "rank_new": false,
             "code": "00014",
             "name": "HYSAN DEV",
             "name_chi": "希慎興業",
@@ -403,7 +403,7 @@
         {
             "rank": 22,
             "rank_change": 0,
-            "rank_new": true,
+            "rank_new": false,
             "code": "00165",
             "name": "CHINA EB LTD",
             "name_chi": "中國光大控股",
@@ -422,7 +422,7 @@
         {
             "rank": 23,
             "rank_change": 0,
-            "rank_new": true,
+            "rank_new": false,
             "code": "00008",
             "name": "PCCW",
             "name_chi": "電訊盈科",
@@ -441,7 +441,7 @@
         {
             "rank": 24,
             "rank_change": 0,
-            "rank_new": true,
+            "rank_new": false,
             "code": "00142",
             "name": "FIRST PACIFIC",
             "name_chi": "第一太平",
@@ -460,7 +460,7 @@
         {
             "rank": 25,
             "rank_change": 0,
-            "rank_new": true,
+            "rank_new": false,
             "code": "00119",
             "name": "POLY PROPERTY",
             "name_chi": "保利置業集團",
@@ -479,7 +479,7 @@
         {
             "rank": 26,
             "rank_change": 0,
-            "rank_new": true,
+            "rank_new": false,
             "code": "00041",
             "name": "GREAT EAGLE H",
             "name_chi": "鷹君",
@@ -498,7 +498,7 @@
         {
             "rank": 27,
             "rank_change": 0,
-            "rank_new": true,
+            "rank_new": false,
             "code": "00108",
             "name": "GR LIFE STYLE",
             "name_chi": "國銳生活",
@@ -517,7 +517,7 @@
         {
             "rank": 28,
             "rank_change": 0,
-            "rank_new": true,
+            "rank_new": false,
             "code": "00215",
             "name": "HUTCHTEL HK",
             "name_chi": "和記電訊香港",
@@ -536,7 +536,7 @@
         {
             "rank": 29,
             "rank_change": 0,
-            "rank_new": true,
+            "rank_new": false,
             "code": "00167",
             "name": "IDT INT'L",
             "name_chi": "IDT INT'L",
@@ -555,7 +555,7 @@
         {
             "rank": 30,
             "rank_change": 0,
-            "rank_new": true,
+            "rank_new": false,
             "code": "00173",
             "name": "K. WAH INT'L",
             "name_chi": "嘉華國際",
