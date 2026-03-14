@@ -1,5 +1,5 @@
 {
-    "update_time": "2026-03-13 23:24",
+    "update_time": "2026-03-13 23:30",
     "stocks": [
         {
             "rank": 1,
@@ -14,11 +14,11 @@
             "short_avg5": 0.0,
             "short_ratio_t2": 0.0,
             "ccass_trade_date": "2026-03-11",
-            "ccass_pct": 0.0,
+            "ccass_pct": 9.17,
             "ccass_delta": 0,
-            "ccass_avg5": 0,
+            "ccass_avg5": 208202,
             "ccass_consec": 0,
-            "insight": "✅ 正常"
+            "insight": "🔥 南向重倉"
         },
         {
             "rank": 2,
@@ -33,11 +33,11 @@
             "short_avg5": 0.0,
             "short_ratio_t2": 0.0,
             "ccass_trade_date": "2026-03-11",
-            "ccass_pct": 0.0,
+            "ccass_pct": 27.01,
             "ccass_delta": 0,
-            "ccass_avg5": 0,
+            "ccass_avg5": -11375500,
             "ccass_consec": 0,
-            "insight": "✅ 正常"
+            "insight": "🔥 南向重倉"
         },
         {
             "rank": 3,
@@ -71,9 +71,9 @@
             "short_avg5": 0.0,
             "short_ratio_t2": 0.0,
             "ccass_trade_date": "2026-03-11",
-            "ccass_pct": 0.0,
+            "ccass_pct": 2.42,
             "ccass_delta": 0,
-            "ccass_avg5": 0,
+            "ccass_avg5": -170070,
             "ccass_consec": 0,
             "insight": "✅ 正常"
         },
@@ -90,11 +90,11 @@
             "short_avg5": 0.0,
             "short_ratio_t2": 0.0,
             "ccass_trade_date": "2026-03-11",
-            "ccass_pct": 0.0,
+            "ccass_pct": 12.14,
             "ccass_delta": 0,
-            "ccass_avg5": 0,
+            "ccass_avg5": 12631166,
             "ccass_consec": 0,
-            "insight": "✅ 正常"
+            "insight": "🔥 南向重倉"
         },
         {
             "rank": 6,
@@ -109,11 +109,11 @@
             "short_avg5": 0.0,
             "short_ratio_t2": 0.0,
             "ccass_trade_date": "2026-03-11",
-            "ccass_pct": 0.0,
+            "ccass_pct": 24.4,
             "ccass_delta": 0,
-            "ccass_avg5": 0,
+            "ccass_avg5": -4232000,
             "ccass_consec": 0,
-            "insight": "✅ 正常"
+            "insight": "🔥 南向重倉"
         },
         {
             "rank": 7,
@@ -128,9 +128,9 @@
             "short_avg5": 0.0,
             "short_ratio_t2": 0.0,
             "ccass_trade_date": "2026-03-11",
-            "ccass_pct": 0.0,
+            "ccass_pct": 1.7,
             "ccass_delta": 0,
-            "ccass_avg5": 0,
+            "ccass_avg5": 255145,
             "ccass_consec": 0,
             "insight": "✅ 正常"
         },
@@ -147,9 +147,9 @@
             "short_avg5": 0.0,
             "short_ratio_t2": 0.0,
             "ccass_trade_date": "2026-03-11",
-            "ccass_pct": 0.0,
+            "ccass_pct": 2.41,
             "ccass_delta": 0,
-            "ccass_avg5": 0,
+            "ccass_avg5": -563625,
             "ccass_consec": 0,
             "insight": "✅ 正常"
         },
@@ -166,11 +166,11 @@
             "short_avg5": 0.0,
             "short_ratio_t2": 0.0,
             "ccass_trade_date": "2026-03-11",
-            "ccass_pct": 0.0,
+            "ccass_pct": 12.31,
             "ccass_delta": 0,
-            "ccass_avg5": 0,
+            "ccass_avg5": 1188554,
             "ccass_consec": 0,
-            "insight": "✅ 正常"
+            "insight": "🔥 南向重倉"
         },
         {
             "rank": 10,
@@ -185,11 +185,11 @@
             "short_avg5": 0.0,
             "short_ratio_t2": 0.0,
             "ccass_trade_date": "2026-03-11",
-            "ccass_pct": 0.0,
+            "ccass_pct": 56.88,
             "ccass_delta": 0,
-            "ccass_avg5": 0,
+            "ccass_avg5": -208000,
             "ccass_consec": 0,
-            "insight": "✅ 正常"
+            "insight": "🔥 南向重倉"
         },
         {
             "rank": 11,
@@ -204,9 +204,9 @@
             "short_avg5": 0.0,
             "short_ratio_t2": 0.0,
             "ccass_trade_date": "2026-03-11",
-            "ccass_pct": 0.0,
+            "ccass_pct": 1.86,
             "ccass_delta": 0,
-            "ccass_avg5": 0,
+            "ccass_avg5": -96000,
             "ccass_consec": 0,
             "insight": "✅ 正常"
         },
@@ -223,11 +223,11 @@
             "short_avg5": 0.0,
             "short_ratio_t2": 0.0,
             "ccass_trade_date": "2026-03-11",
-            "ccass_pct": 0.0,
+            "ccass_pct": 33.03,
             "ccass_delta": 0,
-            "ccass_avg5": 0,
+            "ccass_avg5": 1360714,
             "ccass_consec": 0,
-            "insight": "✅ 正常"
+            "insight": "🔥 南向重倉"
         },
         {
             "rank": 13,
@@ -242,11 +242,11 @@
             "short_avg5": 0.0,
             "short_ratio_t2": 0.0,
             "ccass_trade_date": "2026-03-11",
-            "ccass_pct": 0.0,
+            "ccass_pct": 46.41,
             "ccass_delta": 0,
-            "ccass_avg5": 0,
+            "ccass_avg5": 464000,
             "ccass_consec": 0,
-            "insight": "✅ 正常"
+            "insight": "🔥 南向重倉"
         },
         {
             "rank": 14,
@@ -261,11 +261,11 @@
             "short_avg5": 0.0,
             "short_ratio_t2": 0.0,
             "ccass_trade_date": "2026-03-11",
-            "ccass_pct": 0.0,
+            "ccass_pct": 10.09,
             "ccass_delta": 0,
-            "ccass_avg5": 0,
+            "ccass_avg5": -283625,
             "ccass_consec": 0,
-            "insight": "✅ 正常"
+            "insight": "🔥 南向重倉"
         },
         {
             "rank": 15,
@@ -280,11 +280,11 @@
             "short_avg5": 0.0,
             "short_ratio_t2": 0.0,
             "ccass_trade_date": "2026-03-11",
-            "ccass_pct": 0.0,
+            "ccass_pct": 49.4,
             "ccass_delta": 0,
-            "ccass_avg5": 0,
+            "ccass_avg5": -383500,
             "ccass_consec": 0,
-            "insight": "✅ 正常"
+            "insight": "🔥 南向重倉"
         },
         {
             "rank": 16,
@@ -299,11 +299,11 @@
             "short_avg5": 0.0,
             "short_ratio_t2": 0.0,
             "ccass_trade_date": "2026-03-11",
-            "ccass_pct": 0.0,
+            "ccass_pct": 13.53,
             "ccass_delta": 0,
-            "ccass_avg5": 0,
+            "ccass_avg5": -6319000,
             "ccass_consec": 0,
-            "insight": "✅ 正常"
+            "insight": "🔥 南向重倉"
         },
         {
             "rank": 17,
@@ -318,9 +318,9 @@
             "short_avg5": 0.0,
             "short_ratio_t2": 0.0,
             "ccass_trade_date": "2026-03-11",
-            "ccass_pct": 0.0,
+            "ccass_pct": 1.25,
             "ccass_delta": 0,
-            "ccass_avg5": 0,
+            "ccass_avg5": 288500,
             "ccass_consec": 0,
             "insight": "✅ 正常"
         },
@@ -337,11 +337,11 @@
             "short_avg5": 0.0,
             "short_ratio_t2": 0.0,
             "ccass_trade_date": "2026-03-11",
-            "ccass_pct": 0.0,
+            "ccass_pct": 26.75,
             "ccass_delta": 0,
-            "ccass_avg5": 0,
+            "ccass_avg5": 868144,
             "ccass_consec": 0,
-            "insight": "✅ 正常"
+            "insight": "🔥 南向重倉"
         },
         {
             "rank": 19,
@@ -356,11 +356,11 @@
             "short_avg5": 0.0,
             "short_ratio_t2": 0.0,
             "ccass_trade_date": "2026-03-11",
-            "ccass_pct": 0.0,
+            "ccass_pct": 6.07,
             "ccass_delta": 0,
-            "ccass_avg5": 0,
+            "ccass_avg5": -2000000,
             "ccass_consec": 0,
-            "insight": "✅ 正常"
+            "insight": "🔥 南向重倉"
         },
         {
             "rank": 20,
@@ -375,9 +375,9 @@
             "short_avg5": 0.0,
             "short_ratio_t2": 0.0,
             "ccass_trade_date": "2026-03-11",
-            "ccass_pct": 0.0,
+            "ccass_pct": 4.85,
             "ccass_delta": 0,
-            "ccass_avg5": 0,
+            "ccass_avg5": 557250,
             "ccass_consec": 0,
             "insight": "✅ 正常"
         },
@@ -394,9 +394,9 @@
             "short_avg5": 0.0,
             "short_ratio_t2": 0.0,
             "ccass_trade_date": "2026-03-11",
-            "ccass_pct": 0.0,
+            "ccass_pct": 2.77,
             "ccass_delta": 0,
-            "ccass_avg5": 0,
+            "ccass_avg5": -130750,
             "ccass_consec": 0,
             "insight": "✅ 正常"
         },
@@ -413,11 +413,11 @@
             "short_avg5": 0.0,
             "short_ratio_t2": 0.0,
             "ccass_trade_date": "2026-03-11",
-            "ccass_pct": 0.0,
+            "ccass_pct": 26.48,
             "ccass_delta": 0,
-            "ccass_avg5": 0,
+            "ccass_avg5": -962500,
             "ccass_consec": 0,
-            "insight": "✅ 正常"
+            "insight": "🔥 南向重倉"
         },
         {
             "rank": 23,
@@ -432,9 +432,9 @@
             "short_avg5": 0.0,
             "short_ratio_t2": 0.0,
             "ccass_trade_date": "2026-03-11",
-            "ccass_pct": 0.0,
+            "ccass_pct": 3.29,
             "ccass_delta": 0,
-            "ccass_avg5": 0,
+            "ccass_avg5": 574500,
             "ccass_consec": 0,
             "insight": "✅ 正常"
         },
@@ -451,9 +451,9 @@
             "short_avg5": 0.0,
             "short_ratio_t2": 0.0,
             "ccass_trade_date": "2026-03-11",
-            "ccass_pct": 0.0,
+            "ccass_pct": 2.78,
             "ccass_delta": 0,
-            "ccass_avg5": 0,
+            "ccass_avg5": 554770,
             "ccass_consec": 0,
             "insight": "✅ 正常"
         },
@@ -470,11 +470,11 @@
             "short_avg5": 0.0,
             "short_ratio_t2": 0.0,
             "ccass_trade_date": "2026-03-11",
-            "ccass_pct": 0.0,
+            "ccass_pct": 26.14,
             "ccass_delta": 0,
-            "ccass_avg5": 0,
+            "ccass_avg5": -187386,
             "ccass_consec": 0,
-            "insight": "✅ 正常"
+            "insight": "🔥 南向重倉"
         },
         {
             "rank": 26,
@@ -489,9 +489,9 @@
             "short_avg5": 0.0,
             "short_ratio_t2": 0.0,
             "ccass_trade_date": "2026-03-11",
-            "ccass_pct": 0.0,
+            "ccass_pct": 2.66,
             "ccass_delta": 0,
-            "ccass_avg5": 0,
+            "ccass_avg5": 44500,
             "ccass_consec": 0,
             "insight": "✅ 正常"
         },
@@ -527,9 +527,9 @@
             "short_avg5": 0.0,
             "short_ratio_t2": 0.0,
             "ccass_trade_date": "2026-03-11",
-            "ccass_pct": 0.0,
+            "ccass_pct": 0.07,
             "ccass_delta": 0,
-            "ccass_avg5": 0,
+            "ccass_avg5": -1000,
             "ccass_consec": 0,
             "insight": "✅ 正常"
         },
@@ -565,9 +565,9 @@
             "short_avg5": 0.0,
             "short_ratio_t2": 0.0,
             "ccass_trade_date": "2026-03-11",
-            "ccass_pct": 0.0,
+            "ccass_pct": 4.2,
             "ccass_delta": 0,
-            "ccass_avg5": 0,
+            "ccass_avg5": 507750,
             "ccass_consec": 0,
             "insight": "✅ 正常"
         }
