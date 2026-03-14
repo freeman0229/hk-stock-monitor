@@ -107,8 +107,19 @@ def get_daily_quotation(date: datetime = None) -> pd.DataFrame:
     try:
         resp = requests.get(url, headers=HEADERS, timeout=30)
         resp.raise_for_status()
-        resp.encoding = resp.apparent_encoding or "big5"
-        raw = resp.text
+
+        # Try multiple encodings — HKEX Chinese files are typically Big5
+        raw = None
+        for enc in ("big5", "cp950", "gbk", "utf-8"):
+            try:
+                raw = resp.content.decode(enc)
+                if "STOCK EXCHANGE" in raw or "股票" in raw:
+                    log.info("Daily quotation c.htm decoded with %s", enc)
+                    break
+            except (UnicodeDecodeError, LookupError):
+                continue
+        if raw is None:
+            raw = resp.content.decode("utf-8", errors="replace")
 
         # The file is an HTML page wrapping a <pre> block of fixed-width text
         soup = BeautifulSoup(raw, "html.parser")
