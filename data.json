@@ -1,13 +1,321 @@
 {
-    "update_time": "2026-03-13 23:55",
+    "update_time": "2026-03-13 06:25",
+    "name_map": {
+        "02800": {
+            "en": "TRACKER FUND",
+            "zh": "�մI����@�@�@�@"
+        },
+        "03033": {
+            "en": "CSOP HS TECH",
+            "zh": "�n���ڥͬ�ޡ@�@"
+        },
+        "00700": {
+            "en": "TENCENT",
+            "zh": "�˰T���ѡ@�@�@�@"
+        },
+        "02828": {
+            "en": "HSCEI ETF",
+            "zh": "�ڥͤ�����~�@�@"
+        },
+        "09988": {
+            "en": "BABA-W",
+            "zh": "�����ڤڡТ�@�@"
+        },
+        "00883": {
+            "en": "CNOOC",
+            "zh": "������v�۪o�@�@"
+        },
+        "00005": {
+            "en": "HSBC HOLDINGS",
+            "zh": "���ױ��ѡ@�@�@�@"
+        },
+        "01428": {
+            "en": "BRIGHT SMART",
+            "zh": "ģ�~�Ҩ���ġ@�@"
+        },
+        "00568": {
+            "en": "SHANDONG MOLONG",
+            "zh": "�s�F���s�@�@�@�@"
+        },
+        "01810": {
+            "en": "XIAOMI-W",
+            "zh": "�p�̶��ΡТ�@�@"
+        },
+        "00001": {
+            "en": "CKH HOLDINGS",
+            "zh": "���M�@�@�@�@�@�@"
+        },
+        "00002": {
+            "en": "CLP HOLDINGS",
+            "zh": "���q���ѡ@�@�@�@"
+        },
+        "00006": {
+            "en": "POWER ASSETS",
+            "zh": "�q���~�@�@�@�@"
+        },
+        "00008": {
+            "en": "PCCW",
+            "zh": "�q�T�լ�@�@�@�@"
+        },
+        "00013": {
+            "en": "HUTCHMED",
+            "zh": "�M�����ġ@�@�@�@"
+        },
+        "00014": {
+            "en": "HYSAN DEV",
+            "zh": "�ƷV���~�@�@�@�@"
+        },
+        "00016": {
+            "en": "SHK PPT",
+            "zh": "�s�E��a���@�@�@"
+        },
+        "00017": {
+            "en": "NEW WORLD DEV",
+            "zh": "�s�@�ɵo�i�@�@�@"
+        },
+        "00020": {
+            "en": "SENSETIME-W",
+            "zh": "�Ӵ��Т�@�@�@�@"
+        },
+        "00027": {
+            "en": "GALAXY ENT",
+            "zh": "�Ȫe�T�֡@�@�@�@"
+        },
+        "00029": {
+            "en": "DYNAMIC HOLD",
+            "zh": "�F�O���Ρ@�@�@�@"
+        },
+        "00038": {
+            "en": "FIRST TRACTOR",
+            "zh": "�Ĥ@��Ծ��ѥ��@"
+        },
+        "00041": {
+            "en": "GREAT EAGLE H",
+            "zh": "�N�g�@�@�@�@�@�@"
+        },
+        "00042": {
+            "en": "NE ELECTRIC",
+            "zh": "�F�_�q��@�@�@�@"
+        },
+        "00045": {
+            "en": "HK&S HOTELS",
+            "zh": "�j�s���@�@�@�@�@"
+        },
+        "00083": {
+            "en": "SINO LAND",
+            "zh": "�H�M�m�~�@�@�@�@"
+        },
+        "00085": {
+            "en": "CE HUADA TECH",
+            "zh": "���q�ؤj��ޡ@�@"
+        },
+        "00100": {
+            "en": "MINIMAX-WP",
+            "zh": "�@�@�@�@�@�@�@�@"
+        },
+        "00101": {
+            "en": "HANG LUNG PPT",
+            "zh": "�ڶ��a���@�@�@�@"
+        },
+        "00108": {
+            "en": "GR LIFE STYLE",
+            "zh": "��U�ͬ��@�@�@�@"
+        },
+        "00119": {
+            "en": "POLY PROPERTY",
+            "zh": "�O�Q�m�~���Ρ@�@"
+        },
+        "00135": {
+            "en": "KUNLUN ENERGY",
+            "zh": "���گ෽�@�@�@�@"
+        },
+        "00136": {
+            "en": "CHINA RUYI",
+            "zh": "���꾧�N�@�@�@�@"
+        },
+        "00142": {
+            "en": "FIRST PACIFIC",
+            "zh": "�Ĥ@�ӥ��@�@�@�@"
+        },
+        "00165": {
+            "en": "CHINA EB LTD",
+            "zh": "������j���ѡ@�@"
+        },
+        "00167": {
+            "en": "IDT INT'L",
+            "zh": "�@�@�@�@�@�@�@�@"
+        },
+        "00168": {
+            "en": "TSINGTAO BREW",
+            "zh": "�C�q��s�ѥ��@�@"
+        },
+        "00173": {
+            "en": "K. WAH INT'L",
+            "zh": "�ŵذ�ڡ@�@�@�@"
+        },
+        "00175": {
+            "en": "GEELY AUTO",
+            "zh": "�N�Q�T���@�@�@�@"
+        },
+        "00178": {
+            "en": "SA SA INT'L",
+            "zh": "����ڡ@�@�@�@"
+        },
+        "00182": {
+            "en": "CONCORD NE",
+            "zh": "��X�s�෽�@�@�@"
+        },
+        "00187": {
+            "en": "JINGCHENG MAC",
+            "zh": "�ʫ����q�ѥ��@�@"
+        },
+        "00189": {
+            "en": "DONGYUE GROUP",
+            "zh": "�F�����Ρ@�@�@�@"
+        },
+        "00206": {
+            "en": "CM-ENERGY",
+            "zh": "�ذӯ෽�@�@�@�@"
+        },
+        "00209": {
+            "en": "WINSHINE SCI",
+            "zh": "�s�Ԭ�ǡ@�@�@�@"
+        },
+        "00215": {
+            "en": "HUTCHTEL HK",
+            "zh": "�M�O�q�T����@�@"
+        },
+        "00232": {
+            "en": "CON AERO TECH",
+            "zh": "�j����Ŭ�ޱ���"
+        },
+        "00241": {
+            "en": "ALI HEALTH",
+            "zh": "�������d�@�@�@�@"
+        }
+    },
     "stocks": [
         {
             "rank": 1,
             "rank_change": 0,
+            "rank_new": true,
+            "code": "02800",
+            "name": "TRACKER FUND",
+            "name_chi": "�մI����@�@�@�@",
+            "stock_type": "etf",
+            "turnover": 20268283777,
+            "short_ratio": 0.0,
+            "short_avg5": 0.0,
+            "short_ratio_t2": 0.0,
+            "ccass_trade_date": "2026-03-11",
+            "ccass_pct": 0.61,
+            "ccass_delta": 0,
+            "ccass_avg5": -1625,
+            "ccass_consec": 0,
+            "insight": "✅ 正常"
+        },
+        {
+            "rank": 2,
+            "rank_change": 0,
+            "rank_new": true,
+            "code": "03033",
+            "name": "CSOP HS TECH",
+            "name_chi": "�n���ڥͬ�ޡ@�@",
+            "stock_type": "etf",
+            "turnover": 10362317902,
+            "short_ratio": 0.0,
+            "short_avg5": 0.0,
+            "short_ratio_t2": 0.0,
+            "ccass_trade_date": "2026-03-11",
+            "ccass_pct": 70.37,
+            "ccass_delta": 0,
+            "ccass_avg5": 53134700,
+            "ccass_consec": 0,
+            "insight": "🔥 南向重倉"
+        },
+        {
+            "rank": 3,
+            "rank_change": 0,
+            "rank_new": true,
+            "code": "00700",
+            "name": "TENCENT",
+            "name_chi": "�˰T���ѡ@�@�@�@",
+            "stock_type": "bluechip",
+            "turnover": 9462012419,
+            "short_ratio": 0.0,
+            "short_avg5": 0.0,
+            "short_ratio_t2": 0.0,
+            "ccass_trade_date": "2026-03-11",
+            "ccass_pct": 11.87,
+            "ccass_delta": 0,
+            "ccass_avg5": 2516158,
+            "ccass_consec": 0,
+            "insight": "🔥 南向重倉"
+        },
+        {
+            "rank": 4,
+            "rank_change": 0,
+            "rank_new": true,
+            "code": "02828",
+            "name": "HSCEI ETF",
+            "name_chi": "�ڥͤ�����~�@�@",
+            "stock_type": "etf",
+            "turnover": 8443960807,
+            "short_ratio": 0.0,
+            "short_avg5": 0.0,
+            "short_ratio_t2": 0.0,
+            "ccass_trade_date": "2026-03-11",
+            "ccass_pct": 0.85,
+            "ccass_delta": 0,
+            "ccass_avg5": 169650,
+            "ccass_consec": 0,
+            "insight": "✅ 正常"
+        },
+        {
+            "rank": 5,
+            "rank_change": 0,
+            "rank_new": true,
+            "code": "09988",
+            "name": "BABA-W",
+            "name_chi": "�����ڤڡТ�@�@",
+            "stock_type": "bluechip",
+            "turnover": 6898531818,
+            "short_ratio": 0.0,
+            "short_avg5": 0.0,
+            "short_ratio_t2": 0.0,
+            "ccass_trade_date": "2026-03-11",
+            "ccass_pct": 11.51,
+            "ccass_delta": 0,
+            "ccass_avg5": 2591294,
+            "ccass_consec": 0,
+            "insight": "🔥 南向重倉"
+        },
+        {
+            "rank": 6,
+            "rank_change": 0,
+            "rank_new": true,
+            "code": "00883",
+            "name": "CNOOC",
+            "name_chi": "������v�۪o�@�@",
+            "stock_type": "stable",
+            "turnover": 5578876604,
+            "short_ratio": 0.0,
+            "short_avg5": 0.0,
+            "short_ratio_t2": 0.0,
+            "ccass_trade_date": "2026-03-11",
+            "ccass_pct": 22.08,
+            "ccass_delta": 0,
+            "ccass_avg5": 26119918,
+            "ccass_consec": 0,
+            "insight": "🔥 南向重倉"
+        },
+        {
+            "rank": 7,
+            "rank_change": -6,
             "rank_new": false,
             "code": "00005",
             "name": "HSBC HOLDINGS",
-            "name_chi": "匯豐控股",
+            "name_chi": "���ױ��ѡ@�@�@�@",
             "stock_type": "bluechip",
             "turnover": 4425249878,
             "short_ratio": 0.0,
@@ -21,12 +329,69 @@
             "insight": "🔥 南向重倉"
         },
         {
-            "rank": 2,
+            "rank": 8,
             "rank_change": 0,
+            "rank_new": true,
+            "code": "01428",
+            "name": "BRIGHT SMART",
+            "name_chi": "ģ�~�Ҩ���ġ@�@",
+            "stock_type": "general",
+            "turnover": 3790932916,
+            "short_ratio": 0.0,
+            "short_avg5": 0.0,
+            "short_ratio_t2": 0.0,
+            "ccass_trade_date": "2026-03-11",
+            "ccass_pct": 1.24,
+            "ccass_delta": 0,
+            "ccass_avg5": 7105333,
+            "ccass_consec": 0,
+            "insight": "✅ 正常"
+        },
+        {
+            "rank": 9,
+            "rank_change": 0,
+            "rank_new": true,
+            "code": "00568",
+            "name": "SHANDONG MOLONG",
+            "name_chi": "�s�F���s�@�@�@�@",
+            "stock_type": "general",
+            "turnover": 3340163059,
+            "short_ratio": 0.0,
+            "short_avg5": 0.0,
+            "short_ratio_t2": 0.0,
+            "ccass_trade_date": "2026-03-11",
+            "ccass_pct": 66.04,
+            "ccass_delta": 0,
+            "ccass_avg5": -2036700,
+            "ccass_consec": 0,
+            "insight": "🔥 南向重倉"
+        },
+        {
+            "rank": 10,
+            "rank_change": 0,
+            "rank_new": true,
+            "code": "01810",
+            "name": "XIAOMI-W",
+            "name_chi": "�p�̶��ΡТ�@�@",
+            "stock_type": "bluechip",
+            "turnover": 3021494654,
+            "short_ratio": 0.0,
+            "short_avg5": 0.0,
+            "short_ratio_t2": 0.0,
+            "ccass_trade_date": "2026-03-11",
+            "ccass_pct": 19.89,
+            "ccass_delta": 0,
+            "ccass_avg5": 6836996,
+            "ccass_consec": 0,
+            "insight": "🔥 南向重倉"
+        },
+        {
+            "rank": 11,
+            "rank_change": -9,
             "rank_new": false,
             "code": "00020",
             "name": "SENSETIME-W",
-            "name_chi": "商湯－Ｗ",
+            "name_chi": "�Ӵ��Т�@�@�@�@",
             "stock_type": "general",
             "turnover": 2797844779,
             "short_ratio": 0.0,
@@ -40,12 +405,12 @@
             "insight": "🔥 南向重倉"
         },
         {
-            "rank": 3,
-            "rank_change": 0,
+            "rank": 12,
+            "rank_change": -9,
             "rank_new": false,
             "code": "00100",
             "name": "MINIMAX-WP",
-            "name_chi": "MINIMAX-WP",
+            "name_chi": "�@�@�@�@�@�@�@�@",
             "stock_type": "general",
             "turnover": 1343709285,
             "short_ratio": 0.0,
@@ -59,12 +424,12 @@
             "insight": "✅ 正常"
         },
         {
-            "rank": 4,
-            "rank_change": 0,
+            "rank": 13,
+            "rank_change": -9,
             "rank_new": false,
             "code": "00016",
             "name": "SHK PPT",
-            "name_chi": "新鴻基地產",
+            "name_chi": "�s�E��a���@�@�@",
             "stock_type": "bluechip",
             "turnover": 1230997823,
             "short_ratio": 0.0,
@@ -78,12 +443,12 @@
             "insight": "✅ 正常"
         },
         {
-            "rank": 5,
-            "rank_change": 0,
+            "rank": 14,
+            "rank_change": -9,
             "rank_new": false,
             "code": "00175",
             "name": "GEELY AUTO",
-            "name_chi": "吉利汽車",
+            "name_chi": "�N�Q�T���@�@�@�@",
             "stock_type": "general",
             "turnover": 885286335,
             "short_ratio": 0.0,
@@ -97,12 +462,12 @@
             "insight": "🔥 南向重倉"
         },
         {
-            "rank": 6,
-            "rank_change": 0,
+            "rank": 15,
+            "rank_change": -9,
             "rank_new": false,
             "code": "00136",
             "name": "CHINA RUYI",
-            "name_chi": "中國儒意",
+            "name_chi": "���꾧�N�@�@�@�@",
             "stock_type": "general",
             "turnover": 391798820,
             "short_ratio": 0.0,
@@ -116,12 +481,12 @@
             "insight": "🔥 南向重倉"
         },
         {
-            "rank": 7,
-            "rank_change": 0,
+            "rank": 16,
+            "rank_change": -9,
             "rank_new": false,
             "code": "00027",
             "name": "GALAXY ENT",
-            "name_chi": "銀河娛樂",
+            "name_chi": "�Ȫe�T�֡@�@�@�@",
             "stock_type": "bluechip",
             "turnover": 345848400,
             "short_ratio": 0.0,
@@ -135,12 +500,12 @@
             "insight": "✅ 正常"
         },
         {
-            "rank": 8,
-            "rank_change": 0,
+            "rank": 17,
+            "rank_change": -9,
             "rank_new": false,
             "code": "00001",
             "name": "CKH HOLDINGS",
-            "name_chi": "長和",
+            "name_chi": "���M�@�@�@�@�@�@",
             "stock_type": "general",
             "turnover": 344059907,
             "short_ratio": 0.0,
@@ -154,12 +519,12 @@
             "insight": "✅ 正常"
         },
         {
-            "rank": 9,
-            "rank_change": 0,
+            "rank": 18,
+            "rank_change": -9,
             "rank_new": false,
             "code": "00241",
             "name": "ALI HEALTH",
-            "name_chi": "阿里健康",
+            "name_chi": "�������d�@�@�@�@",
             "stock_type": "general",
             "turnover": 311504926,
             "short_ratio": 0.0,
@@ -173,12 +538,12 @@
             "insight": "🔥 南向重倉"
         },
         {
-            "rank": 10,
-            "rank_change": 0,
+            "rank": 19,
+            "rank_change": -9,
             "rank_new": false,
             "code": "00187",
             "name": "JINGCHENG MAC",
-            "name_chi": "京城機電股份",
+            "name_chi": "�ʫ����q�ѥ��@�@",
             "stock_type": "general",
             "turnover": 253101940,
             "short_ratio": 0.0,
@@ -192,12 +557,12 @@
             "insight": "🔥 南向重倉"
         },
         {
-            "rank": 11,
-            "rank_change": 0,
+            "rank": 20,
+            "rank_change": -9,
             "rank_new": false,
             "code": "00002",
             "name": "CLP HOLDINGS",
-            "name_chi": "中電控股",
+            "name_chi": "���q���ѡ@�@�@�@",
             "stock_type": "stable",
             "turnover": 233935400,
             "short_ratio": 0.0,
@@ -211,12 +576,12 @@
             "insight": "✅ 正常"
         },
         {
-            "rank": 12,
-            "rank_change": 0,
+            "rank": 21,
+            "rank_change": -9,
             "rank_new": false,
             "code": "00189",
             "name": "DONGYUE GROUP",
-            "name_chi": "東岳集團",
+            "name_chi": "�F�����Ρ@�@�@�@",
             "stock_type": "general",
             "turnover": 223281415,
             "short_ratio": 0.0,
@@ -230,12 +595,12 @@
             "insight": "🔥 南向重倉"
         },
         {
-            "rank": 13,
-            "rank_change": 0,
+            "rank": 22,
+            "rank_change": -9,
             "rank_new": false,
             "code": "00168",
             "name": "TSINGTAO BREW",
-            "name_chi": "青島啤酒股份",
+            "name_chi": "�C�q��s�ѥ��@�@",
             "stock_type": "general",
             "turnover": 117624300,
             "short_ratio": 0.0,
@@ -249,12 +614,12 @@
             "insight": "🔥 南向重倉"
         },
         {
-            "rank": 14,
-            "rank_change": 0,
+            "rank": 23,
+            "rank_change": -9,
             "rank_new": false,
             "code": "00006",
             "name": "POWER ASSETS",
-            "name_chi": "電能實業",
+            "name_chi": "�q���~�@�@�@�@",
             "stock_type": "stable",
             "turnover": 108786621,
             "short_ratio": 0.0,
@@ -268,12 +633,12 @@
             "insight": "🔥 南向重倉"
         },
         {
-            "rank": 15,
-            "rank_change": 0,
+            "rank": 24,
+            "rank_change": -9,
             "rank_new": false,
             "code": "00038",
             "name": "FIRST TRACTOR",
-            "name_chi": "第一拖拉機股份",
+            "name_chi": "�Ĥ@��Ծ��ѥ��@",
             "stock_type": "general",
             "turnover": 105953302,
             "short_ratio": 0.0,
@@ -287,12 +652,12 @@
             "insight": "🔥 南向重倉"
         },
         {
-            "rank": 16,
-            "rank_change": 0,
+            "rank": 25,
+            "rank_change": -9,
             "rank_new": false,
             "code": "00135",
             "name": "KUNLUN ENERGY",
-            "name_chi": "昆侖能源",
+            "name_chi": "���گ෽�@�@�@�@",
             "stock_type": "stable",
             "turnover": 83456756,
             "short_ratio": 0.0,
@@ -306,12 +671,12 @@
             "insight": "🔥 南向重倉"
         },
         {
-            "rank": 17,
-            "rank_change": 0,
+            "rank": 26,
+            "rank_change": -9,
             "rank_new": false,
             "code": "00083",
             "name": "SINO LAND",
-            "name_chi": "信和置業",
+            "name_chi": "�H�M�m�~�@�@�@�@",
             "stock_type": "general",
             "turnover": 79021730,
             "short_ratio": 0.0,
@@ -325,12 +690,12 @@
             "insight": "✅ 正常"
         },
         {
-            "rank": 18,
-            "rank_change": 0,
+            "rank": 27,
+            "rank_change": -9,
             "rank_new": false,
             "code": "00013",
             "name": "HUTCHMED",
-            "name_chi": "和黃醫藥",
+            "name_chi": "�M�����ġ@�@�@�@",
             "stock_type": "general",
             "turnover": 74478630,
             "short_ratio": 0.0,
@@ -344,12 +709,12 @@
             "insight": "🔥 南向重倉"
         },
         {
-            "rank": 19,
-            "rank_change": 0,
+            "rank": 28,
+            "rank_change": -9,
             "rank_new": false,
             "code": "00101",
             "name": "HANG LUNG PPT",
-            "name_chi": "恒隆地產",
+            "name_chi": "�ڶ��a���@�@�@�@",
             "stock_type": "general",
             "turnover": 61129498,
             "short_ratio": 0.0,
@@ -363,12 +728,12 @@
             "insight": "🔥 南向重倉"
         },
         {
-            "rank": 20,
-            "rank_change": 0,
+            "rank": 29,
+            "rank_change": -9,
             "rank_new": false,
             "code": "00017",
             "name": "NEW WORLD DEV",
-            "name_chi": "新世界發展",
+            "name_chi": "�s�@�ɵo�i�@�@�@",
             "stock_type": "general",
             "turnover": 58375223,
             "short_ratio": 0.0,
@@ -382,12 +747,12 @@
             "insight": "✅ 正常"
         },
         {
-            "rank": 21,
-            "rank_change": 0,
+            "rank": 30,
+            "rank_change": -9,
             "rank_new": false,
             "code": "00014",
             "name": "HYSAN DEV",
-            "name_chi": "希慎興業",
+            "name_chi": "�ƷV���~�@�@�@�@",
             "stock_type": "general",
             "turnover": 48274619,
             "short_ratio": 0.0,
@@ -397,177 +762,6 @@
             "ccass_pct": 2.77,
             "ccass_delta": 0,
             "ccass_avg5": -130750,
-            "ccass_consec": 0,
-            "insight": "✅ 正常"
-        },
-        {
-            "rank": 22,
-            "rank_change": 0,
-            "rank_new": false,
-            "code": "00165",
-            "name": "CHINA EB LTD",
-            "name_chi": "中國光大控股",
-            "stock_type": "general",
-            "turnover": 39018094,
-            "short_ratio": 0.0,
-            "short_avg5": 0.0,
-            "short_ratio_t2": 0.0,
-            "ccass_trade_date": "2026-03-11",
-            "ccass_pct": 26.48,
-            "ccass_delta": 0,
-            "ccass_avg5": -962500,
-            "ccass_consec": 0,
-            "insight": "🔥 南向重倉"
-        },
-        {
-            "rank": 23,
-            "rank_change": 0,
-            "rank_new": false,
-            "code": "00008",
-            "name": "PCCW",
-            "name_chi": "電訊盈科",
-            "stock_type": "general",
-            "turnover": 31464217,
-            "short_ratio": 0.0,
-            "short_avg5": 0.0,
-            "short_ratio_t2": 0.0,
-            "ccass_trade_date": "2026-03-11",
-            "ccass_pct": 3.29,
-            "ccass_delta": 0,
-            "ccass_avg5": 574500,
-            "ccass_consec": 0,
-            "insight": "✅ 正常"
-        },
-        {
-            "rank": 24,
-            "rank_change": 0,
-            "rank_new": false,
-            "code": "00142",
-            "name": "FIRST PACIFIC",
-            "name_chi": "第一太平",
-            "stock_type": "general",
-            "turnover": 23240510,
-            "short_ratio": 0.0,
-            "short_avg5": 0.0,
-            "short_ratio_t2": 0.0,
-            "ccass_trade_date": "2026-03-11",
-            "ccass_pct": 2.78,
-            "ccass_delta": 0,
-            "ccass_avg5": 554770,
-            "ccass_consec": 0,
-            "insight": "✅ 正常"
-        },
-        {
-            "rank": 25,
-            "rank_change": 0,
-            "rank_new": false,
-            "code": "00119",
-            "name": "POLY PROPERTY",
-            "name_chi": "保利置業集團",
-            "stock_type": "general",
-            "turnover": 15895134,
-            "short_ratio": 0.0,
-            "short_avg5": 0.0,
-            "short_ratio_t2": 0.0,
-            "ccass_trade_date": "2026-03-11",
-            "ccass_pct": 26.14,
-            "ccass_delta": 0,
-            "ccass_avg5": -187386,
-            "ccass_consec": 0,
-            "insight": "🔥 南向重倉"
-        },
-        {
-            "rank": 26,
-            "rank_change": 0,
-            "rank_new": false,
-            "code": "00041",
-            "name": "GREAT EAGLE H",
-            "name_chi": "鷹君",
-            "stock_type": "general",
-            "turnover": 12550480,
-            "short_ratio": 0.0,
-            "short_avg5": 0.0,
-            "short_ratio_t2": 0.0,
-            "ccass_trade_date": "2026-03-11",
-            "ccass_pct": 2.66,
-            "ccass_delta": 0,
-            "ccass_avg5": 44500,
-            "ccass_consec": 0,
-            "insight": "✅ 正常"
-        },
-        {
-            "rank": 27,
-            "rank_change": 0,
-            "rank_new": false,
-            "code": "00108",
-            "name": "GR LIFE STYLE",
-            "name_chi": "國銳生活",
-            "stock_type": "general",
-            "turnover": 10645440,
-            "short_ratio": 0.0,
-            "short_avg5": 0.0,
-            "short_ratio_t2": 0.0,
-            "ccass_trade_date": "2026-03-11",
-            "ccass_pct": 0.0,
-            "ccass_delta": 0,
-            "ccass_avg5": 0,
-            "ccass_consec": 0,
-            "insight": "✅ 正常"
-        },
-        {
-            "rank": 28,
-            "rank_change": 0,
-            "rank_new": false,
-            "code": "00215",
-            "name": "HUTCHTEL HK",
-            "name_chi": "和記電訊香港",
-            "stock_type": "general",
-            "turnover": 6923220,
-            "short_ratio": 0.0,
-            "short_avg5": 0.0,
-            "short_ratio_t2": 0.0,
-            "ccass_trade_date": "2026-03-11",
-            "ccass_pct": 0.07,
-            "ccass_delta": 0,
-            "ccass_avg5": -1000,
-            "ccass_consec": 0,
-            "insight": "✅ 正常"
-        },
-        {
-            "rank": 29,
-            "rank_change": 0,
-            "rank_new": false,
-            "code": "00167",
-            "name": "IDT INT'L",
-            "name_chi": "IDT INT'L",
-            "stock_type": "general",
-            "turnover": 4893087,
-            "short_ratio": 0.0,
-            "short_avg5": 0.0,
-            "short_ratio_t2": 0.0,
-            "ccass_trade_date": "2026-03-11",
-            "ccass_pct": 0.0,
-            "ccass_delta": 0,
-            "ccass_avg5": 0,
-            "ccass_consec": 0,
-            "insight": "✅ 正常"
-        },
-        {
-            "rank": 30,
-            "rank_change": 0,
-            "rank_new": false,
-            "code": "00173",
-            "name": "K. WAH INT'L",
-            "name_chi": "嘉華國際",
-            "stock_type": "general",
-            "turnover": 3878544,
-            "short_ratio": 0.0,
-            "short_avg5": 0.0,
-            "short_ratio_t2": 0.0,
-            "ccass_trade_date": "2026-03-11",
-            "ccass_pct": 4.2,
-            "ccass_delta": 0,
-            "ccass_avg5": 507750,
             "ccass_consec": 0,
             "insight": "✅ 正常"
         }
