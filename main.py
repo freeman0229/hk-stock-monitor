@@ -113,20 +113,34 @@ def get_daily_quotation(date: datetime = None) -> pd.DataFrame:
             f.write(resp.content)
         log.info("Daily quotation saved: %s (%d bytes)", local_path, len(resp.content))
 
-        # Try encodings in order — detect which one gives readable English stock names
+        # Try encodings — pick the one that gives both readable English AND Chinese
         text = None
         for enc in ("cp950", "big5", "utf-8"):
             try:
                 decoded = resp.content.decode(enc)
-                if "TENCENT" in decoded or "TRACKER" in decoded or "CSOP" in decoded:
+                has_eng = "TENCENT" in decoded or "TRACKER" in decoded or "CSOP" in decoded
+                has_chi = any('\u4e00' <= c <= '\u9fff' for c in decoded[:5000])
+                has_garbage = decoded.count('\ufffd') > 50  # too many replacement chars
+                if has_eng and has_chi and not has_garbage:
                     text = decoded
-                    log.info("Daily quotation decoded with: %s", enc)
+                    log.info("Daily quotation decoded with: %s (chi=%s garbage=%d)",
+                             enc, has_chi, decoded.count('\ufffd'))
                     break
             except (UnicodeDecodeError, LookupError):
                 continue
         if text is None:
-            text = resp.content.decode("utf-8", errors="replace")
-            log.warning("Daily quotation: all encodings failed, using utf-8 replace")
+            # Last resort — pick encoding with fewest replacement chars
+            best_enc, best_count = "utf-8", 999999
+            for enc in ("cp950", "big5", "utf-8", "latin-1"):
+                try:
+                    decoded = resp.content.decode(enc, errors="replace")
+                    count = decoded.count('\ufffd')
+                    if count < best_count:
+                        best_count, best_enc = count, enc
+                        text = decoded
+                except (UnicodeDecodeError, LookupError):
+                    continue
+            log.warning("Daily quotation: fallback encoding %s (%d replacements)", best_enc, best_count)
 
         soup = BeautifulSoup(text, "html.parser")
         pre  = soup.find("pre")
@@ -177,6 +191,9 @@ def get_daily_quotation(date: datetime = None) -> pd.DataFrame:
                 continue
             code = str(code_int).zfill(5)
             name_chi = re.sub(r'[\u3000\uff20\uff64\s]+$', '', name_chi).strip()
+            # Only use Chinese name if it contains real CJK characters
+            if not _is_valid_chinese(name_chi):
+                name_chi = name_eng
 
             if code not in seen_codes and turnover > 0:
                 records.append({
@@ -198,8 +215,13 @@ def get_daily_quotation(date: datetime = None) -> pd.DataFrame:
         df = df[df["turnover"] > 0]
 
         # Save full code→name mapping before trimming to Top 30
-        name_map = {r["stock_code"]: {"en": r["name"], "zh": r["name_chi"]}
-                    for r in records if r.get("name_chi")}
+        name_map = {
+            r["stock_code"]: {
+                "en": r["name"],
+                "zh": r["name_chi"] if _is_valid_chinese(r.get("name_chi","")) else r["name"]
+            }
+            for r in records
+        }
         _update_name_map(name_map)
 
         df = df.sort_values("turnover", ascending=False).head(TOP_OUTPUT).reset_index(drop=True)
@@ -514,7 +536,13 @@ DAILY_TV_FILE   = "daily_turnover_history.json"
 RANK_HISTORY_FILE = "rank_history.json"
 NAME_MAP_FILE   = "name_map.json"
 
-def _update_name_map(new_entries: dict):
+def _is_valid_chinese(s: str) -> bool:
+    """Return True if string contains actual CJK characters (not garbled bytes)."""
+    if not s:
+        return False
+    cjk = sum(1 for c in s if '\u4e00' <= c <= '\u9fff' or '\u3400' <= c <= '\u4dbf')
+    garbage = s.count('\ufffd') + s.count('?')
+    return cjk >= 1 and garbage < 3
     """Merge new {code: {en, zh}} entries into the persistent name map."""
     store = load_json_store(NAME_MAP_FILE)
     store.update(new_entries)
