@@ -93,25 +93,41 @@ def save_json_store(path, data):
 # =========================
 def get_daily_quotation(date: datetime = None) -> pd.DataFrame:
     """
-    Parses HKEX daily quotation Chinese file d{YY}{MM}{DD}c.htm.
-    Single line per stock format:
-      CODE  ENG_NAME  CHI_NAME  CUR  PRV  BID  ASK  HIGH  LOW  CLOSE  SHARES  TURNOVER
-    Example:
-      "     1 CKH HOLDINGS   長和　　　　　　 HKD  59.20  58.20 ... 5,899,810  344,059,907"
-    Last two numbers = SHARES, TURNOVER.
+    Downloads and parses HKEX daily quotation Chinese file d{YY}{MM}{DD}c.htm.
+    Saves raw file locally, then parses with dual-pattern regex.
+    Two column layouts exist:
+      Pattern A (top movers): CODE NAME CHI HKD TURNOVER SHARES HIGH LOW
+      Pattern B (main list):  CODE NAME CHI HKD PRV BID CLOSE HIGH LOW CLOSE SHARES TURNOVER
     """
     date = date or datetime.now()
     date_str = date.strftime("%y%m%d")
     url = f"https://www.hkex.com.hk/chi/stat/smstat/dayquot/d{date_str}c.htm"
+    local_path = f"dayquot_{date_str}.htm"
 
     try:
         resp = requests.get(url, headers=HEADERS, timeout=30)
         resp.raise_for_status()
 
-        # Decode raw bytes as cp950 (Windows Big5) — do NOT use apparent_encoding
-        text = resp.content.decode("cp950", errors="replace")
+        # Save raw bytes locally for inspection/debugging
+        with open(local_path, "wb") as f:
+            f.write(resp.content)
+        log.info("Daily quotation saved: %s (%d bytes)", local_path, len(resp.content))
 
-        # Extract <pre> block
+        # Try encodings in order — detect which one gives readable English stock names
+        text = None
+        for enc in ("cp950", "big5", "utf-8"):
+            try:
+                decoded = resp.content.decode(enc)
+                if "TENCENT" in decoded or "TRACKER" in decoded or "CSOP" in decoded:
+                    text = decoded
+                    log.info("Daily quotation decoded with: %s", enc)
+                    break
+            except (UnicodeDecodeError, LookupError):
+                continue
+        if text is None:
+            text = resp.content.decode("utf-8", errors="replace")
+            log.warning("Daily quotation: all encodings failed, using utf-8 replace")
+
         soup = BeautifulSoup(text, "html.parser")
         pre  = soup.find("pre")
         body = pre.get_text() if pre else text
@@ -122,35 +138,57 @@ def get_daily_quotation(date: datetime = None) -> pd.DataFrame:
         seen_codes = set()
 
         for line in body.splitlines():
-            # Pattern: optional *, spaces, 1-5 digit code, English name, Chinese name,
-            #          currency, 6 price fields, shares, turnover
-            m = re.match(
-                r"^[\*\s]{0,5}(\d{1,5})\s+"                      # code
-                r"([A-Z][A-Z0-9 \-&'./#+]{1,20}?)\s{2,}"         # English name
-                r"([\u4e00-\u9fff\uff01-\uffee\u3000-\u303f\s]{1,20}?)\s*"  # Chinese name
-                r"(HKD|USD|CNY|EUR|GBP)\s+"                       # currency
-                r"[\d,.]+\s+[\d,.]+\s+[\d,.]+\s+"                 # PRV BID ASK
-                r"[\d,.]+\s+[\d,.]+\s+[\d,.]+\s+"                 # HIGH LOW CLOSE
-                r"([\d,]+)\s+([\d,]+)\s*$",                       # SHARES  TURNOVER
+            # Two column layouts in the file:
+            # Pattern A (top movers): CODE NAME CHI HKD TURNOVER SHARES HIGH LOW
+            # Pattern B (main list):  CODE NAME CHI HKD PRV BID CLOSE HIGH LOW CLOSE SHARES TURNOVER
+            code_int = None
+            name_eng = None
+            name_chi = None
+            turnover  = 0
+
+            mA = re.match(
+                r"^[\*\s]{0,5}(\d{1,5})\s+"
+                r"([A-Z][A-Z0-9 \-&'./#+]{1,22}?)\s{2,}"
+                r"(.{1,30}?)\s*(HKD|USD|CNY|EUR|GBP)\s+"
+                r"([\d,]{5,})\s+([\d,]{5,})\s+[\d,.]+\s+[\d,.]+\s*$",
                 line
             )
-            if m:
-                code     = fmt_code(m.group(1))
-                name_eng = m.group(2).strip()
-                name_chi = m.group(3).strip().replace("\u3000", "").strip()
-                shares   = to_num(m.group(5))
-                turnover = to_num(m.group(6))
-                if code not in seen_codes and turnover > 0:
-                    records.append({
-                        "stock_code": code,
-                        "name":       name_eng,
-                        "name_chi":   name_chi or name_eng,
-                        "turnover":   turnover,
-                        "shares":     shares,
-                    })
-                    seen_codes.add(code)
-                    if len(records) <= 3:
-                        log.info("Sample: %s %s %s tv=%d", code, name_eng, name_chi, int(turnover))
+            mB = re.match(
+                r"^[\*\s]{0,5}(\d{1,5})\s+"
+                r"([A-Z][A-Z0-9 \-&'./#+]{1,22}?)\s{2,}"
+                r"(.{1,30}?)\s*(HKD|USD|CNY|EUR|GBP)\s+"
+                r"[\d,.]+\s+[\d,.]+\s+[\d,.]+\s+[\d,.]+\s+[\d,.]+\s+[\d,.]+\s+"
+                r"([\d,]{5,})\s+([\d,]{8,})\s*$",
+                line
+            )
+
+            if mA:
+                code_int = int(mA.group(1))
+                name_eng = mA.group(2).strip()
+                name_chi = mA.group(3).strip()
+                turnover = float(mA.group(5).replace(',', ''))
+            elif mB:
+                code_int = int(mB.group(1))
+                name_eng = mB.group(2).strip()
+                name_chi = mB.group(3).strip()
+                turnover = float(mB.group(6).replace(',', ''))
+
+            if code_int is None or code_int > 9999:
+                continue
+            code = str(code_int).zfill(5)
+            name_chi = re.sub(r'[\u3000\uff20\uff64\s]+$', '', name_chi).strip()
+
+            if code not in seen_codes and turnover > 0:
+                records.append({
+                    "stock_code": code,
+                    "name":       name_eng,
+                    "name_chi":   name_chi or name_eng,
+                    "turnover":   turnover,
+                    "shares":     0,
+                })
+                seen_codes.add(code)
+                if len(records) <= 5:
+                    log.info("Sample: %s %s tv=%d", code, name_eng, int(turnover))
 
         if not records:
             log.warning("Daily quotation c.htm: 0 records for %s — check encoding/format", date_str)
@@ -158,6 +196,12 @@ def get_daily_quotation(date: datetime = None) -> pd.DataFrame:
 
         df = pd.DataFrame(records)
         df = df[df["turnover"] > 0]
+
+        # Save full code→name mapping before trimming to Top 30
+        name_map = {r["stock_code"]: {"en": r["name"], "zh": r["name_chi"]}
+                    for r in records if r.get("name_chi")}
+        _update_name_map(name_map)
+
         df = df.sort_values("turnover", ascending=False).head(TOP_OUTPUT).reset_index(drop=True)
         log.info("Daily quotation: %d records for %s", len(df), date_str)
         return df
@@ -466,8 +510,19 @@ def get_ccass_delta_and_avg(stock_codes: list, today_map: dict, days: int = 5):
 # =========================
 # DAILY TURNOVER HISTORY (needed as denominator for short ratio)
 # =========================
-DAILY_TV_FILE = "daily_turnover_history.json"
+DAILY_TV_FILE   = "daily_turnover_history.json"
 RANK_HISTORY_FILE = "rank_history.json"
+NAME_MAP_FILE   = "name_map.json"
+
+def _update_name_map(new_entries: dict):
+    """Merge new {code: {en, zh}} entries into the persistent name map."""
+    store = load_json_store(NAME_MAP_FILE)
+    store.update(new_entries)
+    save_json_store(NAME_MAP_FILE, store)
+
+def get_name_map() -> dict:
+    """Return the full {code: {en, zh}} name map."""
+    return load_json_store(NAME_MAP_FILE)
 
 def save_daily_turnover(date: datetime, df: pd.DataFrame):
     if df.empty:
@@ -870,6 +925,7 @@ def run_analysis():
     # ── 7. Persist output ──
     output = {
         "update_time": trading_day.strftime("%Y-%m-%d %H:%M"),
+        "name_map":    get_name_map(),
         "stocks":      results,
     }
     with open("data.json", "w", encoding="utf-8") as f:
