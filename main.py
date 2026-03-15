@@ -86,10 +86,29 @@ def save_json_store(path, data):
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 # =========================
-# SOURCE 1 – HKEX DAILY QUOTATION (fixed-width text)
-# URL: https://www.hkex.com.hk/eng/stat/smstat/dayquot/d{YY}{MM}{DD}e.htm
-# Relevant section: "SALES RECORDS FOR ALL STOCKS"
-# Each stock line: CODE  NAME  CUR  SHARES  TURNOVER($)
+# NAME MAP HELPERS (used by get_daily_quotation below)
+# =========================
+NAME_MAP_FILE = "name_map.json"
+
+def _is_valid_chinese(s: str) -> bool:
+    """Return True if string contains actual CJK characters (not garbled bytes)."""
+    if not s:
+        return False
+    cjk = sum(1 for c in s if '\u4e00' <= c <= '\u9fff' or '\u3400' <= c <= '\u4dbf')
+    garbage = s.count('\ufffd') + s.count('?')
+    return cjk >= 1 and garbage < 3
+
+def _update_name_map(new_entries: dict):
+    """Merge new {code: {en, zh}} entries into the persistent name map."""
+    store = load_json_store(NAME_MAP_FILE)
+    store.update(new_entries)
+    save_json_store(NAME_MAP_FILE, store)
+
+def get_name_map() -> dict:
+    return load_json_store(NAME_MAP_FILE)
+
+# =========================
+# SOURCE 1 – HKEX DAILY QUOTATION
 # =========================
 def get_daily_quotation(date: datetime = None) -> pd.DataFrame:
     """
@@ -113,34 +132,24 @@ def get_daily_quotation(date: datetime = None) -> pd.DataFrame:
             f.write(resp.content)
         log.info("Daily quotation saved: %s (%d bytes)", local_path, len(resp.content))
 
-        # Try encodings — pick the one that gives both readable English AND Chinese
+        # Try encodings — pick one that gives English names AND valid Chinese chars
         text = None
         for enc in ("cp950", "big5", "utf-8"):
             try:
                 decoded = resp.content.decode(enc)
                 has_eng = "TENCENT" in decoded or "TRACKER" in decoded or "CSOP" in decoded
                 has_chi = any('\u4e00' <= c <= '\u9fff' for c in decoded[:5000])
-                has_garbage = decoded.count('\ufffd') > 50  # too many replacement chars
+                has_garbage = decoded.count('\ufffd') > 50
                 if has_eng and has_chi and not has_garbage:
                     text = decoded
-                    log.info("Daily quotation decoded with: %s (chi=%s garbage=%d)",
-                             enc, has_chi, decoded.count('\ufffd'))
+                    log.info("Daily quotation decoded with: %s", enc)
                     break
             except (UnicodeDecodeError, LookupError):
                 continue
         if text is None:
-            # Last resort — pick encoding with fewest replacement chars
-            best_enc, best_count = "utf-8", 999999
-            for enc in ("cp950", "big5", "utf-8", "latin-1"):
-                try:
-                    decoded = resp.content.decode(enc, errors="replace")
-                    count = decoded.count('\ufffd')
-                    if count < best_count:
-                        best_count, best_enc = count, enc
-                        text = decoded
-                except (UnicodeDecodeError, LookupError):
-                    continue
-            log.warning("Daily quotation: fallback encoding %s (%d replacements)", best_enc, best_count)
+            # latin-1 never raises but won't have Chinese — use as last resort
+            text = resp.content.decode("latin-1", errors="replace")
+            log.warning("Daily quotation: using latin-1 fallback (no Chinese names)")
 
         soup = BeautifulSoup(text, "html.parser")
         pre  = soup.find("pre")
@@ -534,23 +543,6 @@ def get_ccass_delta_and_avg(stock_codes: list, today_map: dict, days: int = 5):
 # =========================
 DAILY_TV_FILE   = "daily_turnover_history.json"
 RANK_HISTORY_FILE = "rank_history.json"
-NAME_MAP_FILE   = "name_map.json"
-
-def _is_valid_chinese(s: str) -> bool:
-    """Return True if string contains actual CJK characters (not garbled bytes)."""
-    if not s:
-        return False
-    cjk = sum(1 for c in s if '\u4e00' <= c <= '\u9fff' or '\u3400' <= c <= '\u4dbf')
-    garbage = s.count('\ufffd') + s.count('?')
-    return cjk >= 1 and garbage < 3
-    """Merge new {code: {en, zh}} entries into the persistent name map."""
-    store = load_json_store(NAME_MAP_FILE)
-    store.update(new_entries)
-    save_json_store(NAME_MAP_FILE, store)
-
-def get_name_map() -> dict:
-    """Return the full {code: {en, zh}} name map."""
-    return load_json_store(NAME_MAP_FILE)
 
 def save_daily_turnover(date: datetime, df: pd.DataFrame):
     if df.empty:
