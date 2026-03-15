@@ -1,207 +1,207 @@
 {
-    "update_time": "2026-03-13 06:25",
+    "update_time": "2026-03-13 06:57",
     "name_map": {
         "02800": {
             "en": "TRACKER FUND",
-            "zh": "�մI����@�@�@�@"
+            "zh": "TRACKER FUND"
         },
         "03033": {
             "en": "CSOP HS TECH",
-            "zh": "�n���ڥͬ�ޡ@�@"
+            "zh": "CSOP HS TECH"
         },
         "00700": {
             "en": "TENCENT",
-            "zh": "�˰T���ѡ@�@�@�@"
+            "zh": "TENCENT"
         },
         "02828": {
             "en": "HSCEI ETF",
-            "zh": "�ڥͤ�����~�@�@"
+            "zh": "HSCEI ETF"
         },
         "09988": {
             "en": "BABA-W",
-            "zh": "�����ڤڡТ�@�@"
+            "zh": "BABA-W"
         },
         "00883": {
             "en": "CNOOC",
-            "zh": "������v�۪o�@�@"
+            "zh": "CNOOC"
         },
         "00005": {
             "en": "HSBC HOLDINGS",
-            "zh": "���ױ��ѡ@�@�@�@"
+            "zh": "HSBC HOLDINGS"
         },
         "01428": {
             "en": "BRIGHT SMART",
-            "zh": "ģ�~�Ҩ���ġ@�@"
+            "zh": "BRIGHT SMART"
         },
         "00568": {
             "en": "SHANDONG MOLONG",
-            "zh": "�s�F���s�@�@�@�@"
+            "zh": "SHANDONG MOLONG"
         },
         "01810": {
             "en": "XIAOMI-W",
-            "zh": "�p�̶��ΡТ�@�@"
+            "zh": "XIAOMI-W"
         },
         "00001": {
             "en": "CKH HOLDINGS",
-            "zh": "���M�@�@�@�@�@�@"
+            "zh": "CKH HOLDINGS"
         },
         "00002": {
             "en": "CLP HOLDINGS",
-            "zh": "���q���ѡ@�@�@�@"
+            "zh": "CLP HOLDINGS"
         },
         "00006": {
             "en": "POWER ASSETS",
-            "zh": "�q���~�@�@�@�@"
+            "zh": "POWER ASSETS"
         },
         "00008": {
             "en": "PCCW",
-            "zh": "�q�T�լ�@�@�@�@"
+            "zh": "PCCW"
         },
         "00013": {
             "en": "HUTCHMED",
-            "zh": "�M�����ġ@�@�@�@"
+            "zh": "HUTCHMED"
         },
         "00014": {
             "en": "HYSAN DEV",
-            "zh": "�ƷV���~�@�@�@�@"
+            "zh": "HYSAN DEV"
         },
         "00016": {
             "en": "SHK PPT",
-            "zh": "�s�E��a���@�@�@"
+            "zh": "SHK PPT"
         },
         "00017": {
             "en": "NEW WORLD DEV",
-            "zh": "�s�@�ɵo�i�@�@�@"
+            "zh": "NEW WORLD DEV"
         },
         "00020": {
             "en": "SENSETIME-W",
-            "zh": "�Ӵ��Т�@�@�@�@"
+            "zh": "SENSETIME-W"
         },
         "00027": {
             "en": "GALAXY ENT",
-            "zh": "�Ȫe�T�֡@�@�@�@"
+            "zh": "GALAXY ENT"
         },
         "00029": {
             "en": "DYNAMIC HOLD",
-            "zh": "�F�O���Ρ@�@�@�@"
+            "zh": "DYNAMIC HOLD"
         },
         "00038": {
             "en": "FIRST TRACTOR",
-            "zh": "�Ĥ@��Ծ��ѥ��@"
+            "zh": "FIRST TRACTOR"
         },
         "00041": {
             "en": "GREAT EAGLE H",
-            "zh": "�N�g�@�@�@�@�@�@"
+            "zh": "GREAT EAGLE H"
         },
         "00042": {
             "en": "NE ELECTRIC",
-            "zh": "�F�_�q��@�@�@�@"
+            "zh": "NE ELECTRIC"
         },
         "00045": {
             "en": "HK&S HOTELS",
-            "zh": "�j�s���@�@�@�@�@"
+            "zh": "HK&S HOTELS"
         },
         "00083": {
             "en": "SINO LAND",
-            "zh": "�H�M�m�~�@�@�@�@"
+            "zh": "SINO LAND"
         },
         "00085": {
             "en": "CE HUADA TECH",
-            "zh": "���q�ؤj��ޡ@�@"
+            "zh": "CE HUADA TECH"
         },
         "00100": {
             "en": "MINIMAX-WP",
-            "zh": "�@�@�@�@�@�@�@�@"
+            "zh": "MINIMAX-WP"
         },
         "00101": {
             "en": "HANG LUNG PPT",
-            "zh": "�ڶ��a���@�@�@�@"
+            "zh": "HANG LUNG PPT"
         },
         "00108": {
             "en": "GR LIFE STYLE",
-            "zh": "��U�ͬ��@�@�@�@"
+            "zh": "GR LIFE STYLE"
         },
         "00119": {
             "en": "POLY PROPERTY",
-            "zh": "�O�Q�m�~���Ρ@�@"
+            "zh": "POLY PROPERTY"
         },
         "00135": {
             "en": "KUNLUN ENERGY",
-            "zh": "���گ෽�@�@�@�@"
+            "zh": "KUNLUN ENERGY"
         },
         "00136": {
             "en": "CHINA RUYI",
-            "zh": "���꾧�N�@�@�@�@"
+            "zh": "CHINA RUYI"
         },
         "00142": {
             "en": "FIRST PACIFIC",
-            "zh": "�Ĥ@�ӥ��@�@�@�@"
+            "zh": "FIRST PACIFIC"
         },
         "00165": {
             "en": "CHINA EB LTD",
-            "zh": "������j���ѡ@�@"
+            "zh": "CHINA EB LTD"
         },
         "00167": {
             "en": "IDT INT'L",
-            "zh": "�@�@�@�@�@�@�@�@"
+            "zh": "IDT INT'L"
         },
         "00168": {
             "en": "TSINGTAO BREW",
-            "zh": "�C�q��s�ѥ��@�@"
+            "zh": "TSINGTAO BREW"
         },
         "00173": {
             "en": "K. WAH INT'L",
-            "zh": "�ŵذ�ڡ@�@�@�@"
+            "zh": "K. WAH INT'L"
         },
         "00175": {
             "en": "GEELY AUTO",
-            "zh": "�N�Q�T���@�@�@�@"
+            "zh": "GEELY AUTO"
         },
         "00178": {
             "en": "SA SA INT'L",
-            "zh": "����ڡ@�@�@�@"
+            "zh": "SA SA INT'L"
         },
         "00182": {
             "en": "CONCORD NE",
-            "zh": "��X�s�෽�@�@�@"
+            "zh": "CONCORD NE"
         },
         "00187": {
             "en": "JINGCHENG MAC",
-            "zh": "�ʫ����q�ѥ��@�@"
+            "zh": "JINGCHENG MAC"
         },
         "00189": {
             "en": "DONGYUE GROUP",
-            "zh": "�F�����Ρ@�@�@�@"
+            "zh": "DONGYUE GROUP"
         },
         "00206": {
             "en": "CM-ENERGY",
-            "zh": "�ذӯ෽�@�@�@�@"
+            "zh": "CM-ENERGY"
         },
         "00209": {
             "en": "WINSHINE SCI",
-            "zh": "�s�Ԭ�ǡ@�@�@�@"
+            "zh": "WINSHINE SCI"
         },
         "00215": {
             "en": "HUTCHTEL HK",
-            "zh": "�M�O�q�T����@�@"
+            "zh": "HUTCHTEL HK"
         },
         "00232": {
             "en": "CON AERO TECH",
-            "zh": "�j����Ŭ�ޱ���"
+            "zh": "CON AERO TECH"
         },
         "00241": {
             "en": "ALI HEALTH",
-            "zh": "�������d�@�@�@�@"
+            "zh": "ALI HEALTH"
         }
     },
     "stocks": [
         {
             "rank": 1,
             "rank_change": 0,
-            "rank_new": true,
+            "rank_new": false,
             "code": "02800",
             "name": "TRACKER FUND",
-            "name_chi": "�մI����@�@�@�@",
+            "name_chi": "TRACKER FUND",
             "stock_type": "etf",
             "turnover": 20268283777,
             "short_ratio": 0.0,
@@ -217,10 +217,10 @@
         {
             "rank": 2,
             "rank_change": 0,
-            "rank_new": true,
+            "rank_new": false,
             "code": "03033",
             "name": "CSOP HS TECH",
-            "name_chi": "�n���ڥͬ�ޡ@�@",
+            "name_chi": "CSOP HS TECH",
             "stock_type": "etf",
             "turnover": 10362317902,
             "short_ratio": 0.0,
@@ -236,10 +236,10 @@
         {
             "rank": 3,
             "rank_change": 0,
-            "rank_new": true,
+            "rank_new": false,
             "code": "00700",
             "name": "TENCENT",
-            "name_chi": "�˰T���ѡ@�@�@�@",
+            "name_chi": "TENCENT",
             "stock_type": "bluechip",
             "turnover": 9462012419,
             "short_ratio": 0.0,
@@ -255,10 +255,10 @@
         {
             "rank": 4,
             "rank_change": 0,
-            "rank_new": true,
+            "rank_new": false,
             "code": "02828",
             "name": "HSCEI ETF",
-            "name_chi": "�ڥͤ�����~�@�@",
+            "name_chi": "HSCEI ETF",
             "stock_type": "etf",
             "turnover": 8443960807,
             "short_ratio": 0.0,
@@ -274,10 +274,10 @@
         {
             "rank": 5,
             "rank_change": 0,
-            "rank_new": true,
+            "rank_new": false,
             "code": "09988",
             "name": "BABA-W",
-            "name_chi": "�����ڤڡТ�@�@",
+            "name_chi": "BABA-W",
             "stock_type": "bluechip",
             "turnover": 6898531818,
             "short_ratio": 0.0,
@@ -293,10 +293,10 @@
         {
             "rank": 6,
             "rank_change": 0,
-            "rank_new": true,
+            "rank_new": false,
             "code": "00883",
             "name": "CNOOC",
-            "name_chi": "������v�۪o�@�@",
+            "name_chi": "CNOOC",
             "stock_type": "stable",
             "turnover": 5578876604,
             "short_ratio": 0.0,
@@ -311,11 +311,11 @@
         },
         {
             "rank": 7,
-            "rank_change": -6,
+            "rank_change": 0,
             "rank_new": false,
             "code": "00005",
             "name": "HSBC HOLDINGS",
-            "name_chi": "���ױ��ѡ@�@�@�@",
+            "name_chi": "HSBC HOLDINGS",
             "stock_type": "bluechip",
             "turnover": 4425249878,
             "short_ratio": 0.0,
@@ -331,10 +331,10 @@
         {
             "rank": 8,
             "rank_change": 0,
-            "rank_new": true,
+            "rank_new": false,
             "code": "01428",
             "name": "BRIGHT SMART",
-            "name_chi": "ģ�~�Ҩ���ġ@�@",
+            "name_chi": "BRIGHT SMART",
             "stock_type": "general",
             "turnover": 3790932916,
             "short_ratio": 0.0,
@@ -350,10 +350,10 @@
         {
             "rank": 9,
             "rank_change": 0,
-            "rank_new": true,
+            "rank_new": false,
             "code": "00568",
             "name": "SHANDONG MOLONG",
-            "name_chi": "�s�F���s�@�@�@�@",
+            "name_chi": "SHANDONG MOLONG",
             "stock_type": "general",
             "turnover": 3340163059,
             "short_ratio": 0.0,
@@ -369,10 +369,10 @@
         {
             "rank": 10,
             "rank_change": 0,
-            "rank_new": true,
+            "rank_new": false,
             "code": "01810",
             "name": "XIAOMI-W",
-            "name_chi": "�p�̶��ΡТ�@�@",
+            "name_chi": "XIAOMI-W",
             "stock_type": "bluechip",
             "turnover": 3021494654,
             "short_ratio": 0.0,
@@ -387,11 +387,11 @@
         },
         {
             "rank": 11,
-            "rank_change": -9,
+            "rank_change": 0,
             "rank_new": false,
             "code": "00020",
             "name": "SENSETIME-W",
-            "name_chi": "�Ӵ��Т�@�@�@�@",
+            "name_chi": "SENSETIME-W",
             "stock_type": "general",
             "turnover": 2797844779,
             "short_ratio": 0.0,
@@ -406,11 +406,11 @@
         },
         {
             "rank": 12,
-            "rank_change": -9,
+            "rank_change": 0,
             "rank_new": false,
             "code": "00100",
             "name": "MINIMAX-WP",
-            "name_chi": "�@�@�@�@�@�@�@�@",
+            "name_chi": "MINIMAX-WP",
             "stock_type": "general",
             "turnover": 1343709285,
             "short_ratio": 0.0,
@@ -425,11 +425,11 @@
         },
         {
             "rank": 13,
-            "rank_change": -9,
+            "rank_change": 0,
             "rank_new": false,
             "code": "00016",
             "name": "SHK PPT",
-            "name_chi": "�s�E��a���@�@�@",
+            "name_chi": "SHK PPT",
             "stock_type": "bluechip",
             "turnover": 1230997823,
             "short_ratio": 0.0,
@@ -444,11 +444,11 @@
         },
         {
             "rank": 14,
-            "rank_change": -9,
+            "rank_change": 0,
             "rank_new": false,
             "code": "00175",
             "name": "GEELY AUTO",
-            "name_chi": "�N�Q�T���@�@�@�@",
+            "name_chi": "GEELY AUTO",
             "stock_type": "general",
             "turnover": 885286335,
             "short_ratio": 0.0,
@@ -463,11 +463,11 @@
         },
         {
             "rank": 15,
-            "rank_change": -9,
+            "rank_change": 0,
             "rank_new": false,
             "code": "00136",
             "name": "CHINA RUYI",
-            "name_chi": "���꾧�N�@�@�@�@",
+            "name_chi": "CHINA RUYI",
             "stock_type": "general",
             "turnover": 391798820,
             "short_ratio": 0.0,
@@ -482,11 +482,11 @@
         },
         {
             "rank": 16,
-            "rank_change": -9,
+            "rank_change": 0,
             "rank_new": false,
             "code": "00027",
             "name": "GALAXY ENT",
-            "name_chi": "�Ȫe�T�֡@�@�@�@",
+            "name_chi": "GALAXY ENT",
             "stock_type": "bluechip",
             "turnover": 345848400,
             "short_ratio": 0.0,
@@ -501,11 +501,11 @@
         },
         {
             "rank": 17,
-            "rank_change": -9,
+            "rank_change": 0,
             "rank_new": false,
             "code": "00001",
             "name": "CKH HOLDINGS",
-            "name_chi": "���M�@�@�@�@�@�@",
+            "name_chi": "CKH HOLDINGS",
             "stock_type": "general",
             "turnover": 344059907,
             "short_ratio": 0.0,
@@ -520,11 +520,11 @@
         },
         {
             "rank": 18,
-            "rank_change": -9,
+            "rank_change": 0,
             "rank_new": false,
             "code": "00241",
             "name": "ALI HEALTH",
-            "name_chi": "�������d�@�@�@�@",
+            "name_chi": "ALI HEALTH",
             "stock_type": "general",
             "turnover": 311504926,
             "short_ratio": 0.0,
@@ -539,11 +539,11 @@
         },
         {
             "rank": 19,
-            "rank_change": -9,
+            "rank_change": 0,
             "rank_new": false,
             "code": "00187",
             "name": "JINGCHENG MAC",
-            "name_chi": "�ʫ����q�ѥ��@�@",
+            "name_chi": "JINGCHENG MAC",
             "stock_type": "general",
             "turnover": 253101940,
             "short_ratio": 0.0,
@@ -558,11 +558,11 @@
         },
         {
             "rank": 20,
-            "rank_change": -9,
+            "rank_change": 0,
             "rank_new": false,
             "code": "00002",
             "name": "CLP HOLDINGS",
-            "name_chi": "���q���ѡ@�@�@�@",
+            "name_chi": "CLP HOLDINGS",
             "stock_type": "stable",
             "turnover": 233935400,
             "short_ratio": 0.0,
@@ -577,11 +577,11 @@
         },
         {
             "rank": 21,
-            "rank_change": -9,
+            "rank_change": 0,
             "rank_new": false,
             "code": "00189",
             "name": "DONGYUE GROUP",
-            "name_chi": "�F�����Ρ@�@�@�@",
+            "name_chi": "DONGYUE GROUP",
             "stock_type": "general",
             "turnover": 223281415,
             "short_ratio": 0.0,
@@ -596,11 +596,11 @@
         },
         {
             "rank": 22,
-            "rank_change": -9,
+            "rank_change": 0,
             "rank_new": false,
             "code": "00168",
             "name": "TSINGTAO BREW",
-            "name_chi": "�C�q��s�ѥ��@�@",
+            "name_chi": "TSINGTAO BREW",
             "stock_type": "general",
             "turnover": 117624300,
             "short_ratio": 0.0,
@@ -615,11 +615,11 @@
         },
         {
             "rank": 23,
-            "rank_change": -9,
+            "rank_change": 0,
             "rank_new": false,
             "code": "00006",
             "name": "POWER ASSETS",
-            "name_chi": "�q���~�@�@�@�@",
+            "name_chi": "POWER ASSETS",
             "stock_type": "stable",
             "turnover": 108786621,
             "short_ratio": 0.0,
@@ -634,11 +634,11 @@
         },
         {
             "rank": 24,
-            "rank_change": -9,
+            "rank_change": 0,
             "rank_new": false,
             "code": "00038",
             "name": "FIRST TRACTOR",
-            "name_chi": "�Ĥ@��Ծ��ѥ��@",
+            "name_chi": "FIRST TRACTOR",
             "stock_type": "general",
             "turnover": 105953302,
             "short_ratio": 0.0,
@@ -653,11 +653,11 @@
         },
         {
             "rank": 25,
-            "rank_change": -9,
+            "rank_change": 0,
             "rank_new": false,
             "code": "00135",
             "name": "KUNLUN ENERGY",
-            "name_chi": "���گ෽�@�@�@�@",
+            "name_chi": "KUNLUN ENERGY",
             "stock_type": "stable",
             "turnover": 83456756,
             "short_ratio": 0.0,
@@ -672,11 +672,11 @@
         },
         {
             "rank": 26,
-            "rank_change": -9,
+            "rank_change": 0,
             "rank_new": false,
             "code": "00083",
             "name": "SINO LAND",
-            "name_chi": "�H�M�m�~�@�@�@�@",
+            "name_chi": "SINO LAND",
             "stock_type": "general",
             "turnover": 79021730,
             "short_ratio": 0.0,
@@ -691,11 +691,11 @@
         },
         {
             "rank": 27,
-            "rank_change": -9,
+            "rank_change": 0,
             "rank_new": false,
             "code": "00013",
             "name": "HUTCHMED",
-            "name_chi": "�M�����ġ@�@�@�@",
+            "name_chi": "HUTCHMED",
             "stock_type": "general",
             "turnover": 74478630,
             "short_ratio": 0.0,
@@ -710,11 +710,11 @@
         },
         {
             "rank": 28,
-            "rank_change": -9,
+            "rank_change": 0,
             "rank_new": false,
             "code": "00101",
             "name": "HANG LUNG PPT",
-            "name_chi": "�ڶ��a���@�@�@�@",
+            "name_chi": "HANG LUNG PPT",
             "stock_type": "general",
             "turnover": 61129498,
             "short_ratio": 0.0,
@@ -729,11 +729,11 @@
         },
         {
             "rank": 29,
-            "rank_change": -9,
+            "rank_change": 0,
             "rank_new": false,
             "code": "00017",
             "name": "NEW WORLD DEV",
-            "name_chi": "�s�@�ɵo�i�@�@�@",
+            "name_chi": "NEW WORLD DEV",
             "stock_type": "general",
             "turnover": 58375223,
             "short_ratio": 0.0,
@@ -748,11 +748,11 @@
         },
         {
             "rank": 30,
-            "rank_change": -9,
+            "rank_change": 0,
             "rank_new": false,
             "code": "00014",
             "name": "HYSAN DEV",
-            "name_chi": "�ƷV���~�@�@�@�@",
+            "name_chi": "HYSAN DEV",
             "stock_type": "general",
             "turnover": 48274619,
             "short_ratio": 0.0,
