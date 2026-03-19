@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>港股 Top 30 策略報告</title>
+<title>港股 Top 100 策略報告</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Noto+Sans+HK:wght@300;400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
@@ -266,8 +266,8 @@
     <div class="logo-block">
       <div class="logo-pip"></div>
       <div class="logo-text">
-        <h1>港股 Top 30 策略報告</h1>
-        <p>HKEX DAILY QUOTATION · SHORT SELLING · CCASS SOUTHBOUND · TOP 30</p>
+        <h1>港股 Top 100 策略報告</h1>
+        <p>HKEX DAILY QUOTATION · SHORT SELLING · CCASS SOUTHBOUND · SOUTHBOUND TOP 10</p>
       </div>
     </div>
     <div id="time-display">正在載入…</div>
@@ -292,7 +292,7 @@
     <!-- LEFT: Chart -->
     <div class="panel">
       <div class="panel-head">
-        <h2><span class="dot"></span>南向淨成交 — 按港股成交額排列</h2>
+        <h2><span class="dot"></span>南向十大 — 按港股成交額排列</h2>
       </div>
       <div class="legend-row" id="legend-row"></div>
       <div class="chart-scroll-outer">
@@ -363,9 +363,12 @@ function renderAll(data) {
   setTime(data.update_time);
   renderKPIs(data.stocks);
   renderAlerts(data.stocks);
-  renderIndustryBar(data.stocks);
-  renderChart(data.stocks);
-  renderTable(data.stocks);
+  renderIndustryBar(data.stocks);  // industry bar still shows all 100
+  // Chart + table: only stocks with southbound data, ordered by daily turnover rank
+  const sbStocks = data.stocks.filter(x => x.sb_net !== 0);
+  const display  = sbStocks.length ? sbStocks : data.stocks;
+  renderChart(display);
+  renderTable(display);
 }
 
 // ── INDUSTRY FILTER BAR ────────────────────────────────────────────────────
@@ -439,7 +442,7 @@ function renderKPIs(s) {
     <div class="kpi">
       <div class="label">異動股數</div>
       <div class="value" style="color:var(--amber)">${alerts}</div>
-      <div class="sub">共 ${s.length} 隻監控</div>
+      <div class="sub">南向 ${s.filter(x=>x.sb_net!==0).length} / 共 ${s.length} 隻</div>
     </div>
     <div class="kpi">
       <div class="label">今日均沽空率</div>
@@ -456,7 +459,7 @@ function renderKPIs(s) {
       <div class="value" style="color:${netCcass >= 0 ? 'var(--green)' : 'var(--red)'}">
         ${fmtDelta(netCcass)}
       </div>
-      <div class="sub">Top 30 合計今日增減</div>
+      <div class="sub">Top 100 合計今日增減</div>
     </div>
     <div class="kpi">
       <div class="label">榜首成交額</div>
@@ -585,7 +588,6 @@ function renderChart(s) {
   const barLeg = [
     { fill: '#1D9E7555', border: '#1D9E75', label: '南向淨買入' },
     { fill: '#E24B4A55', border: '#E24B4A', label: '南向淨賣出' },
-    { fill: '#1e253530', border: '#1e2535', label: '不在十大' },
   ];
 
   legRow.innerHTML = `
