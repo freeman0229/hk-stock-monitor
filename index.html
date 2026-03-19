@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>港股 Top 30 策略報告</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Noto+Sans+HK:wght@300;400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg:        #0a0d12;
+    --surface:   #111520;
+    --border:    #1e2535;
+    --muted:     #3a4460;
+    --dim:       #6b7a9e;
+    --text:      #c8d4f0;
+    --bright:    #e8eeff;
+    --red:       #ff4d6a;
+    --red-dim:   rgba(255,77,106,0.12);
+    --amber:     #ffb347;
+    --amber-dim: rgba(255,179,71,0.12);
+    --green:     #3dffa0;
+    --green-dim: rgba(61,255,160,0.10);
+    --blue:      #4d9fff;
+    --blue-dim:  rgba(77,159,255,0.12);
+    --purple:    #a78bfa;
+    --accent:    #7c6aff;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Noto Sans HK', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 24px 20px 60px;
+  }
+  body::before {
+    content: '';
+    position: fixed; inset: 0; z-index: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+    pointer-events: none;
+  }
+  .wrap { max-width: 1400px; margin: 0 auto; position: relative; z-index: 1; }
+
+  /* ── HEADER ── */
+  header {
+    display: flex; align-items: flex-end; justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 20px; margin-bottom: 24px;
+    flex-wrap: wrap; gap: 12px;
+  }
+  .logo-block { display: flex; align-items: center; gap: 14px; }
+  .logo-pip {
+    width: 5px; height: 44px;
+    background: linear-gradient(180deg, var(--accent), var(--blue));
+    border-radius: 3px; flex-shrink: 0;
+  }
+  .logo-text h1 { font-size: 19px; font-weight: 700; color: var(--bright); letter-spacing:.02em; }
+  .logo-text p  { font-size: 11px; color: var(--dim); font-family:'DM Mono',monospace; letter-spacing:.05em; margin-top:3px; }
+  #time-display { font-family:'DM Mono',monospace; font-size:12px; color:var(--dim); text-align:right; line-height:1.7; }
+  #time-display .stale { color:var(--red); }
+  #time-display .live  { color:var(--green); }
+
+  /* ── KPI BAR ── */
+  .kpi-row { display:grid; grid-template-columns:repeat(5,1fr); gap:10px; margin-bottom:20px; }
+  .kpi {
+    background:var(--surface); border:1px solid var(--border);
+    border-radius:10px; padding:14px 16px; transition:border-color .2s;
+  }
+  .kpi:hover { border-color:var(--muted); }
+  .kpi .label { font-size:10px; color:var(--dim); font-family:'DM Mono',monospace; text-transform:uppercase; letter-spacing:.08em; margin-bottom:7px; }
+  .kpi .value { font-size:24px; font-weight:700; color:var(--bright); line-height:1; }
+  .kpi .sub   { font-size:11px; color:var(--dim); margin-top:4px; }
+
+  /* ── ALERTS ── */
+  #alerts { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:20px; min-height:34px; align-items:center; }
+  .alert-chip {
+    display:inline-flex; align-items:center; gap:7px;
+    padding:6px 12px; border-radius:6px;
+    font-size:12px; font-weight:500; border:1px solid;
+    cursor:default; transition:transform .15s, box-shadow .15s;
+    animation:fadeIn .3s ease both;
+  }
+  .alert-chip:hover { transform:translateY(-2px); box-shadow:0 4px 16px rgba(0,0,0,.4); }
+  .chip-red   { background:var(--red-dim);   border-color:rgba(255,77,106,.3);  color:#ff8099; }
+  .chip-amber { background:var(--amber-dim); border-color:rgba(255,179,71,.3);  color:#ffc97a; }
+  .chip-blue  { background:var(--blue-dim);  border-color:rgba(77,159,255,.3);  color:#7db8ff; }
+  .chip-green { background:var(--green-dim); border-color:rgba(61,255,160,.3);  color:#5fffb8; }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:none} }
+
+  /* ── LAYOUT ── */
+  .main-layout { display:grid; grid-template-columns:1fr 400px; gap:14px; align-items:stretch; }
+
+  .panel {
+    background:var(--surface); border:1px solid var(--border);
+    border-radius:12px; overflow:hidden;
+    display:flex; flex-direction:column;
+  }
+  .panel-head {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:13px 18px; border-bottom:1px solid var(--border);
+  }
+  .panel-head h2 {
+    font-size:13px; font-weight:500; color:var(--bright);
+    display:flex; align-items:center; gap:8px;
+  }
+  .panel-head h2 .dot {
+    width:6px; height:6px; border-radius:50%;
+    background:var(--accent); box-shadow:0 0 6px var(--accent);
+  }
+
+  .chart-wrap { padding:12px 16px 16px; position:relative; }
+
+  /* ── TABLE ── */
+  .tbl-wrap { overflow-x:auto; overflow-y:auto; flex:1; max-height:100%; }
+  table { width:100%; border-collapse:collapse; font-size:12px; }
+  thead th {
+    position:sticky; top:0; z-index:2; background:var(--surface);
+    padding:9px 11px; text-align:right;
+    font-family:'DM Mono',monospace; font-size:10px; font-weight:500;
+    color:var(--dim); text-transform:uppercase; letter-spacing:.06em;
+    border-bottom:1px solid var(--border); white-space:nowrap;
+  }
+  thead th:first-child, thead th:nth-child(2) { text-align:left; }
+  tbody tr { border-bottom:1px solid rgba(30,37,53,.6); transition:background .12s; }
+  tbody tr:hover { background:rgba(255,255,255,.025); }
+  td { padding:8px 11px; color:var(--text); text-align:right; white-space:nowrap; }
+  td:first-child { text-align:left; }
+  td:nth-child(2) { text-align:left; color:var(--bright); font-weight:500; }
+
+  .mono { font-family:'DM Mono',monospace; }
+  .code-cell { color:var(--dim); font-family:'DM Mono',monospace; font-size:11px; }
+
+  .badge {
+    display:inline-block; padding:2px 7px; border-radius:4px;
+    font-size:10px; font-weight:600; white-space:nowrap;
+  }
+  .badge-red    { background:var(--red-dim);   color:#ff8099; }
+  .badge-amber  { background:var(--amber-dim); color:#ffc97a; }
+  .badge-blue   { background:var(--blue-dim);  color:#7db8ff; }
+  .badge-green  { background:var(--green-dim); color:#5fffb8; }
+
+  /* rank change badges */
+  .rank-new  { background:#BA751733; color:#EF9F27; border:1px solid #BA751766;
+               font-size:10px; font-weight:600; padding:1px 5px; border-radius:4px; margin-left:4px; white-space:nowrap; }
+  .rank-up   { background:#E24B4A22; color:#F09595; border:1px solid #E24B4A55;
+               font-size:10px; font-weight:600; padding:1px 5px; border-radius:4px; margin-left:4px; white-space:nowrap; }
+  .rank-up.big { color:#E24B4A; border-color:#E24B4A99; background:#E24B4A33; }
+  .rank-down { font-size:10px; color:var(--dim); margin-left:4px; white-space:nowrap; }
+
+  /* delta colouring */
+  .pos { color:var(--green); }
+  .neg { color:var(--red); }
+  .neu { color:var(--dim); }
+
+  .legend-row {
+    display:flex; gap:14px; flex-wrap:wrap; align-items:center;
+    padding:10px 16px; border-bottom:1px solid var(--border);
+    font-size:11px; color:var(--dim); font-family:'DM Mono',monospace;
+  }
+  .leg-item { display:flex; align-items:center; gap:5px; }
+  .leg-dot  { width:16px; height:10px; border-radius:2px; flex-shrink:0; }
+
+  /* ── LOADER / ERROR ── */
+  .loader {
+    display:flex; flex-direction:column; align-items:center;
+    justify-content:center; height:120px; gap:12px;
+  }
+  .spinner {
+    width:32px; height:32px; border-radius:50%;
+    border:2px solid var(--border); border-top-color:var(--accent);
+    animation:spin .8s linear infinite;
+  }
+  @keyframes spin { to{transform:rotate(360deg)} }
+  .err-box {
+    background:var(--red-dim); border:1px solid rgba(255,77,106,.3);
+    color:#ff8099; padding:14px; border-radius:8px; font-size:13px; margin:14px;
+  }
+
+  /* ── RESPONSIVE ── */
+  @media(max-width:1000px) {
+    .main-layout { grid-template-columns:1fr; }
+    .kpi-row { grid-template-columns:repeat(3,1fr); }
+  }
+  @media(max-width:600px) {
+    body { padding:12px 12px 60px; }
+    .kpi-row { grid-template-columns:repeat(2,1fr); }
+    .kpi { padding:10px 12px; }
+    .kpi .value { font-size:20px; }
+    .logo-text h1 { font-size:15px; }
+    .logo-text p  { display:none; }
+
+    /* Alert chips: full width on mobile */
+    .alert-chip { font-size:11px; padding:8px 10px; width:100%; }
+
+    /* Chart: horizontal scroll container on mobile */
+    .chart-scroll-outer {
+      overflow-x:auto;
+      -webkit-overflow-scrolling:touch;
+    }
+
+    /* Table: hide non-essential columns on mobile */
+    .tbl-wrap { max-height:none; }
+    table { table-layout:fixed; min-width:420px; }
+    .col-hide-mobile { display:none; }
+
+    /* Sticky header already works — ensure z-index is above scroll */
+    thead th { font-size:9px; padding:8px 7px; }
+    td        { padding:7px 7px; font-size:11px; }
+
+    /* Touch-friendly: larger tap targets */
+    .badge { padding:4px 8px; font-size:10px; }
+  }
+  /* ── TOGGLE SWITCH ── */
+  .switch-wrap { display:flex; align-items:center; gap:8px; font-size:11px; color:var(--dim); cursor:pointer; }
+  .switch { position:relative; width:32px; height:18px; flex-shrink:0; }
+  .switch input { opacity:0; width:0; height:0; }
+  .slider {
+    position:absolute; inset:0; border-radius:18px;
+    background:var(--muted); transition:background .2s; cursor:pointer;
+  }
+  .slider::before {
+    content:''; position:absolute;
+    width:12px; height:12px; left:3px; top:3px;
+    border-radius:50%; background:#fff;
+    transition:transform .2s;
+  }
+  .switch input:checked + .slider { background:var(--accent); }
+  .switch input:checked + .slider::before { transform:translateX(14px); }
+
+  /* ── INDUSTRY FILTER BAR ── */
+  .industry-bar {
+    display:flex; flex-wrap:wrap; gap:6px;
+    margin-bottom:18px; align-items:center;
+  }
+  .industry-bar .bar-label {
+    font-size:10px; color:var(--dim); font-family:'DM Mono',monospace;
+    text-transform:uppercase; letter-spacing:.07em; margin-right:4px;
+  }
+  .ind-btn {
+    display:inline-flex; align-items:center; gap:4px;
+    padding:4px 10px; border-radius:5px; font-size:11px; font-weight:500;
+    border:1px solid var(--border); background:var(--surface);
+    color:var(--dim); cursor:pointer; transition:all .15s; white-space:nowrap;
+  }
+  .ind-btn:hover { border-color:var(--muted); color:var(--text); }
+  .ind-btn.active {
+    border-color:var(--accent); color:var(--accent);
+    background:rgba(124,106,255,.12);
+  }
+  .ind-btn .ind-count {
+    font-size:10px; font-family:'DM Mono',monospace;
+    background:var(--muted); color:var(--dim);
+    padding:0 4px; border-radius:3px; min-width:16px; text-align:center;
+  }
+  .ind-btn.active .ind-count { background:rgba(124,106,255,.25); color:var(--accent); }
+  /* fade out non-active rows when filter is on */
+  tbody tr.ind-dim { opacity:.25; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="logo-block">
+      <div class="logo-pip"></div>
+      <div class="logo-text">
+        <h1>港股 Top 30 策略報告</h1>
+        <p>HKEX DAILY QUOTATION · SHORT SELLING · CCASS SOUTHBOUND · TOP 30</p>
+      </div>
+    </div>
+    <div id="time-display">正在載入…</div>
+  </header>
+
+  <div class="kpi-row" id="kpi-row">
+    <div class="kpi"><div class="loader"><div class="spinner"></div></div></div>
+    <div class="kpi"><div class="loader"><div class="spinner"></div></div></div>
+    <div class="kpi"><div class="loader"><div class="spinner"></div></div></div>
+    <div class="kpi"><div class="loader"><div class="spinner"></div></div></div>
+    <div class="kpi"><div class="loader"><div class="spinner"></div></div></div>
+  </div>
+
+  <div id="alerts">
+    <div class="loader"><div class="spinner"></div><span style="color:var(--dim);font-size:12px">載入警報…</span></div>
+  </div>
+
+  <div class="industry-bar" id="industry-bar"></div>
+
+  <div class="main-layout">
+
+    <!-- LEFT: Chart -->
+    <div class="panel">
+      <div class="panel-head">
+        <h2><span class="dot"></span>南向淨成交 — 按港股成交額排列</h2>
+      </div>
+      <div class="legend-row" id="legend-row"></div>
+      <div class="chart-scroll-outer">
+        <div class="chart-wrap" id="chart-wrap">
+          <div class="loader"><div class="spinner"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: Table -->
+    <div class="panel">
+      <div class="panel-head">
+        <h2><span class="dot"></span>個股明細</h2>
+        <label class="switch-wrap" title="顯示／隱藏個股明細">
+          <span>隱藏</span>
+          <div class="switch">
+            <input type="checkbox" id="tbl-toggle" onchange="toggleTable(this.checked)">
+            <span class="slider"></span>
+          </div>
+        </label>
+      </div>
+      <div id="tbl-body" style="display:none">
+        <div class="tbl-wrap" id="tbl-wrap">
+          <div class="loader"><div class="spinner"></div></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const DATA_URL = 'data.json';
+let chart = null;
+let stocks = [];
+
+// ── NAME LOOKUP ────────────────────────────────────────────────────────────
+// Populated dynamically from data.json name_map (built by parser from c.htm).
+// Contains both English and Chinese names for all stocks seen in the daily file.
+let NAME_MAP = {};
+
+function zhName(code, fallback) {
+  const entry = NAME_MAP[code];
+  if (entry && entry.zh) return entry.zh;
+  return fallback || code;
+}
+
+// ── FETCH ──────────────────────────────────────────────────────────────────
+async function load() {
+  try {
+    const res = await fetch(DATA_URL + '?t=' + Date.now());
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    if (!data.stocks?.length) throw new Error('數據格式錯誤');
+    stocks = data.stocks;
+    if (data.name_map) NAME_MAP = data.name_map;
+    renderAll(data);
+  } catch(err) {
+    document.getElementById('time-display').innerHTML = '<span class="stale">❌ 載入失敗</span>';
+    document.getElementById('alerts').innerHTML = `<div class="err-box">⚠️ 無法載入 data.json：${err.message}</div>`;
+    document.getElementById('kpi-row').innerHTML = '';
+    document.getElementById('tbl-wrap').innerHTML = `<div class="err-box">請確認 data.json 已更新。</div>`;
+    document.getElementById('chart-wrap').innerHTML = '';
+  }
+}
+
+function renderAll(data) {
+  setTime(data.update_time);
+  renderKPIs(data.stocks);
+  renderAlerts(data.stocks);
+  renderIndustryBar(data.stocks);
+  renderChart(data.stocks);
+  renderTable(data.stocks);
+}
+
+// ── INDUSTRY FILTER BAR ────────────────────────────────────────────────────
+let activeIndustry = null;
+
+function renderIndustryBar(s) {
+  const bar = document.getElementById('industry-bar');
+  if (!bar) return;
+
+  // Count stocks per industry
+  const counts = {};
+  for (const x of s) {
+    const key = x.industry_zh || '其他';
+    counts[key] = (counts[key] || 0) + 1;
+  }
+
+  // Industry colour map
+  const IND_COLOR = {
+    'ETF':    '#7c6aff', '科技':   '#4d9fff', '軟件服務':'#4d9fff',
+    '銀行':   '#3dffa0', '保險':   '#3dffa0', '金融':   '#3dffa0',
+    '能源':   '#ffb347', '公用事業':'#ffb347', '電訊':   '#ffb347',
+    '地產':   '#ff8c66', '工業':   '#ff8c66', '金屬礦產':'#ff8c66',
+    '汽車':   '#f0c040', '零售消費':'#f0c040', '醫療':   '#c4b5fd',
+    '運輸':   '#a0b4c8', '綜合企業':'#a0b4c8', '其他':   '#6b7a9e',
+  };
+
+  const sorted = Object.entries(counts).sort((a,b) => b[1] - a[1]);
+
+  bar.innerHTML = `<span class="bar-label">行業</span>` + sorted.map(([ind, cnt]) => {
+    const col   = IND_COLOR[ind] || '#6b7a9e';
+    const dot   = `<span style="width:7px;height:7px;border-radius:50%;background:${col};flex-shrink:0"></span>`;
+    const isAct = activeIndustry === ind;
+    return `<button class="ind-btn${isAct?' active':''}" onclick="filterIndustry('${ind}')"
+              title="${ind}">${dot}${ind}<span class="ind-count">${cnt}</span></button>`;
+  }).join('') + `<button class="ind-btn${activeIndustry===null?' active':''}" onclick="filterIndustry(null)">全部</button>`;
+}
+
+function filterIndustry(ind) {
+  activeIndustry = ind;
+  renderIndustryBar(stocks);
+
+  // Dim non-matching rows in table
+  document.querySelectorAll('tbody tr[data-ind]').forEach(tr => {
+    const match = ind === null || tr.dataset.ind === ind;
+    tr.classList.toggle('ind-dim', !match);
+  });
+
+  // Rerender chart with filtered highlight
+  renderChart(stocks);
+}
+
+// ── TIME ───────────────────────────────────────────────────────────────────
+function setTime(ts) {
+  const el = document.getElementById('time-display');
+  const age = (Date.now() - new Date(ts.replace(' ','T'))) / 3600000;
+  const cls = age > 4 ? 'stale' : 'live';
+  el.innerHTML = `<span class="${cls}">${age > 4 ? '⚠' : '●'} 最後更新</span><br><span style="color:var(--bright)">${ts}</span>`;
+}
+
+// ── KPIs ───────────────────────────────────────────────────────────────────
+function renderKPIs(s) {
+  const alerts     = s.filter(x => x.insight).length;
+  const avgShort   = (s.reduce((a,x)=>a+x.short_ratio,0)/s.length).toFixed(1);
+  const avgShort5  = (s.reduce((a,x)=>a+x.short_avg5,0)/s.length).toFixed(1);
+  const netCcass   = s.reduce((a,x)=>a+x.ccass_delta,0);
+  const topSh      = s.slice().sort((a,b)=>b.short_ratio-a.short_ratio)[0];
+  const fmt = n => n >= 1e9 ? (n/1e9).toFixed(1)+'B' : n >= 1e6 ? (n/1e6).toFixed(0)+'M' : n.toLocaleString();
+  const fmtDelta = n => (n > 0 ? '+' : '') + (n >= 1e6 ? (n/1e6).toFixed(1)+'M' : n >= 1e3 ? (n/1e3).toFixed(0)+'K' : n);
+
+  document.getElementById('kpi-row').innerHTML = `
+    <div class="kpi">
+      <div class="label">異動股數</div>
+      <div class="value" style="color:var(--amber)">${alerts}</div>
+      <div class="sub">共 ${s.length} 隻監控</div>
+    </div>
+    <div class="kpi">
+      <div class="label">今日均沽空率</div>
+      <div class="value" style="color:var(--red)">${avgShort}%</div>
+      <div class="sub">5日均 ${avgShort5}%</div>
+    </div>
+    <div class="kpi">
+      <div class="label">最高沽空率</div>
+      <div class="value" style="color:var(--red)">${topSh ? topSh.short_ratio : '--'}%</div>
+      <div class="sub">${topSh ? zhName(topSh.code, topSh.name_chi || topSh.name) : '--'}</div>
+    </div>
+    <div class="kpi">
+      <div class="label">CCASS 淨增持</div>
+      <div class="value" style="color:${netCcass >= 0 ? 'var(--green)' : 'var(--red)'}">
+        ${fmtDelta(netCcass)}
+      </div>
+      <div class="sub">Top 30 合計今日增減</div>
+    </div>
+    <div class="kpi">
+      <div class="label">榜首成交額</div>
+      <div class="value" style="color:var(--blue)">${fmt(s[0]?.turnover||0)}</div>
+      <div class="sub">${s[0] ? zhName(s[0].code, s[0].name_chi || s[0].name) : '--'}</div>
+    </div>
+  `;
+}
+
+// ── ALERTS ─────────────────────────────────────────────────────────────────
+function renderAlerts(s) {
+  const box = document.getElementById('alerts');
+  const flagged = s.filter(x => x.insight);
+  if (!flagged.length) {
+    box.innerHTML = '<span style="color:var(--green);font-size:13px">✅ 目前無重大異動</span>';
+    return;
+  }
+  box.innerHTML = flagged.map(x => {
+    const { chip } = insightStyle(x.insight);
+    const typeLabel = x.industry_zh || x.stock_type;
+    const consec = x.ccass_consec || 0;
+    const consecStr = consec !== 0 ? ` · 連續${Math.abs(consec)}s${consec > 0 ? '增' : '減'}持` : '';
+    const tradeDateStr = (x.insight && x.insight.includes('機構'))
+      ? ` · 對應交易日 ${x.ccass_trade_date||''}` : '';
+    return `
+      <div class="alert-chip ${chip}">
+        ${x.insight} <strong>${zhName(x.code, x.name_chi || x.name)}</strong>
+        &nbsp;[${typeLabel}]&nbsp;·&nbsp;沽空率 ${x.short_ratio}%&nbsp;·&nbsp;CCASS Δ ${fmtSh(x.ccass_delta)}${consecStr}${tradeDateStr}
+      </div>
+    `;
+  }).join('');
+}
+
+function fmtSh(n) {
+  const s = n >= 0 ? '+' : '';
+  if (Math.abs(n) >= 1e6) return s + (n/1e6).toFixed(1) + 'M';
+  if (Math.abs(n) >= 1e3) return s + (n/1e3).toFixed(0) + 'K';
+  return s + n;
+}
+
+// ── CHART COLOURS ──────────────────────────────────────────────────────────
+const SHORT_LINE  = '#E24B4A';
+const SHORT_DASH  = '#F09595';
+const CCASS_LINE  = '#1D9E75';
+const CCASS_DASH  = '#5DCAA5';
+
+const BAR_FILL = {
+  '機構增持':    '#185FA555',
+  '空頭平倉信號':'#D85A3055',
+  '異常高沽空':  '#E24B4A55',
+  '北水流入':    '#1D9E7555',
+  '北水流出':    '#E24B4A55',
+};
+const BAR_BORDER = {
+  '機構增持':    '#185FA5',
+  '空頭平倉信號':'#D85A30',
+  '異常高沽空':  '#E24B4A',
+  '北水流入':    '#1D9E75',
+  '北水流出':    '#E24B4A',
+};
+
+function renderChart(s) {
+  const wrap   = document.getElementById('chart-wrap');
+  const legRow = document.getElementById('legend-row');
+
+  const isMobile = window.innerWidth < 600;
+  const rowH  = isMobile ? 22 : 26;
+  const minW  = isMobile ? 560 : 0;   // force horizontal scroll on small screens
+  const h = s.length * rowH + 80;
+  wrap.style.height = h + 'px';
+  if (minW) wrap.style.minWidth = minW + 'px';
+  wrap.innerHTML = '<canvas id="mainChart"></canvas>';
+
+  function insightKey(ins) {
+    if (!ins) return '';
+    for (const k of Object.keys(BAR_FILL)) {
+      if (ins.includes(k)) return k;
+    }
+    return '';
+  }
+  function rankSuffix(x) {
+    if (x.rank_new)          return ' ★';
+    if (x.rank_change >= 10) return ` ↑${x.rank_change}`;
+    if (x.rank_change >= 3)  return ` ↑${x.rank_change}`;
+    if (x.rank_change <= -3) return ` ↓${Math.abs(x.rank_change)}`;
+    return '';
+  }
+  const labels = isMobile
+    ? s.map((x, i) => `${String(i+1).padStart(2,'0')} ${x.code}${rankSuffix(x)}`)
+    : s.map((x, i) => `${String(i+1).padStart(2,'0')} ${x.code} ${zhName(x.code, x.name_chi || x.name)}${rankSuffix(x)}`);
+  // Southbound net turnover (HKD M) — 0 for stocks not in top10 that day
+  const sbNet    = s.map(x => +(( x.sb_net  || 0) / 1e6).toFixed(1));
+  const sbBuy    = s.map(x => +(( x.sb_buy  || 0) / 1e8).toFixed(2));
+  const sbSell   = s.map(x => +(( x.sb_sell || 0) / 1e8).toFixed(2));
+  const shortR   = s.map(x => x.short_ratio);
+  const shortA   = s.map(x => x.short_avg5);
+  const ccassD   = s.map(x => +(x.ccass_delta / 1e6).toFixed(2));
+  const ccassA   = s.map(x => +(x.ccass_avg5  / 1e6).toFixed(2));
+
+  // Bar colour: green=net buy, red=net sell, dim=not in southbound top10
+  const SB_BUY_FILL   = '#1D9E7555';
+  const SB_BUY_BORDER = '#1D9E75';
+  const SB_SELL_FILL  = '#E24B4A55';
+  const SB_SELL_BORDER= '#E24B4A';
+  const SB_ZERO_FILL  = '#1e253530';
+  const SB_ZERO_BORDER= '#1e2535';
+  const barFill   = s.map(x => {
+    const match = !activeIndustry || (x.industry_zh || '其他') === activeIndustry;
+    if (!match) return '#1e253520';
+    if (!x.sb_net) return SB_ZERO_FILL;
+    return x.sb_net > 0 ? SB_BUY_FILL : SB_SELL_FILL;
+  });
+  const barBorder = s.map(x => {
+    const match = !activeIndustry || (x.industry_zh || '其他') === activeIndustry;
+    if (!match) return '#1e2535';
+    if (!x.sb_net) return SB_ZERO_BORDER;
+    return x.sb_net > 0 ? SB_BUY_BORDER : SB_SELL_BORDER;
+  });
+
+  const lineLeg = [
+    { style: `background:${SHORT_LINE};height:2px;border-radius:1px;width:18px`,       label: '沽空率 今日' },
+    { style: `border-top:2px dashed ${SHORT_DASH};height:0;width:18px;margin:5px 0`,  label: '沽空率 5日均' },
+    { style: `background:${CCASS_LINE};height:2px;border-radius:1px;width:18px`,       label: 'CCASS Δ 今日' },
+    { style: `border-top:2px dashed ${CCASS_DASH};height:0;width:18px;margin:5px 0`,  label: 'CCASS Δ 5日均' },
+  ];
+  const barLeg = [
+    { fill: '#1D9E7555', border: '#1D9E75', label: '南向淨買入' },
+    { fill: '#E24B4A55', border: '#E24B4A', label: '南向淨賣出' },
+    { fill: '#1e253530', border: '#1e2535', label: '不在十大' },
+  ];
+
+  legRow.innerHTML = `
+    <div style="display:flex;flex-wrap:wrap;gap:12px;width:100%;align-items:center">
+      ${lineLeg.map(l => `
+        <div class="leg-item">
+          <div style="${l.style};flex-shrink:0"></div>
+          <span>${l.label}</span>
+        </div>`).join('')}
+    </div>
+    <div style="width:100%;height:1px;background:var(--border);margin:4px 0"></div>
+    <div style="font-size:10px;color:var(--dim);letter-spacing:.06em;text-transform:uppercase;width:100%;margin-bottom:4px">南向淨成交棒 — 排列按港股成交額</div>
+    <div style="display:flex;flex-wrap:wrap;gap:10px;width:100%;align-items:center">
+      ${barLeg.map(l => `
+        <div class="leg-item">
+          <div style="width:12px;height:10px;border-radius:2px;background:${l.fill};border:1px solid ${l.border};flex-shrink:0"></div>
+          <span>${l.label}</span>
+        </div>`).join('')}
+    </div>
+  `;
+
+  if (chart) chart.destroy();
+
+  chart = new Chart(document.getElementById('mainChart').getContext('2d'), {
+    data: {
+      labels,
+      datasets: [
+        {
+          type: 'bar', label: '南向淨成交 (百萬 HKD)',
+          data: sbNet,
+          backgroundColor: barFill,
+          borderColor:     barBorder,
+          borderWidth: 1, borderRadius: 2, borderSkipped: false,
+          xAxisID: 'xSbNet', order: 4,
+        },
+        {
+          type: 'line', label: '沽空率 今日',
+          data: shortR,
+          borderColor: SHORT_LINE, backgroundColor: 'transparent',
+          borderWidth: 2, pointRadius: 3, pointBackgroundColor: SHORT_LINE,
+          tension: 0, xAxisID: 'xShort', order: 1,
+        },
+        {
+          type: 'line', label: '沽空率 5日均',
+          data: shortA,
+          borderColor: SHORT_DASH, backgroundColor: 'transparent',
+          borderWidth: 1.5, borderDash: [5, 4], pointRadius: 2, pointBackgroundColor: SHORT_DASH,
+          tension: 0, xAxisID: 'xShort', order: 2,
+        },
+        {
+          type: 'line', label: 'CCASS Δ 今日 (M股)',
+          data: ccassD,
+          borderColor: CCASS_LINE, backgroundColor: 'transparent',
+          borderWidth: 2, pointRadius: 3, pointBackgroundColor: CCASS_LINE,
+          tension: 0, xAxisID: 'xCcass', order: 1,
+        },
+        {
+          type: 'line', label: 'CCASS Δ 5日均 (M股)',
+          data: ccassA,
+          borderColor: CCASS_DASH, backgroundColor: 'transparent',
+          borderWidth: 1.5, borderDash: [5, 4], pointRadius: 2, pointBackgroundColor: CCASS_DASH,
+          tension: 0, xAxisID: 'xCcass', order: 2,
+        },
+      ]
+    },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false, animation: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#0a0d12',
+          borderColor: '#1e2535', borderWidth: 1,
+          titleColor: '#e8eeff', bodyColor: '#6b7a9e',
+          padding: 10,
+          callbacks: {
+            title: items => {
+              const x = s[items[0].dataIndex];
+              return `${x.code} ${zhName(x.code, x.name_chi || x.name)}${x.insight ? '  ['+x.insight+']' : ''}`;
+            },
+            label: ctx => {
+              const v   = ctx.parsed.x;
+              const idx = ctx.dataIndex;
+              if (ctx.datasetIndex === 0) {
+                const buy  = sbBuy[idx],  sell = sbSell[idx];
+                if (!v) return ` 南向: 不在十大`;
+                return ` 南向淨: ${v >= 0 ? '+' : ''}${v.toFixed(0)}M  (買${buy.toFixed(2)}億 / 賣${sell.toFixed(2)}億)`;
+              }
+              if (ctx.datasetIndex === 1) return ` 沽空率: ${v.toFixed(1)}%`;
+              if (ctx.datasetIndex === 2) return ` 沽空5日均: ${v.toFixed(1)}%`;
+              if (ctx.datasetIndex === 3) return ` CCASS Δ: ${v >= 0 ? '+' : ''}${v.toFixed(2)}M`;
+              if (ctx.datasetIndex === 4) return ` CCASS均: ${v >= 0 ? '+' : ''}${v.toFixed(2)}M`;
+              return '';
+            }
+          }
+        }
+      },
+      scales: {
+        y: {
+          grid: { display: false }, border: { display: false },
+          ticks: { color: '#6b7a9e', font: { family: "'Noto Sans HK', sans-serif", size: 11 }, crossAlign: 'far' }
+        },
+        xSbNet: {
+          type: 'linear', position: 'top',
+          grid: { color: 'rgba(30,37,53,0.8)', drawTicks: false }, border: { display: false },
+          ticks: { color: '#1D9E75', font: { family: "'DM Mono', monospace", size: 10 },
+                   callback: v => (v >= 0 ? '+' : '') + (Math.abs(v) >= 1000 ? (v/1000).toFixed(1)+'B' : v+'M'),
+                   maxTicksLimit: 6 },
+          title: { display: true, text: '南向淨成交 (HKD)', color: '#1D9E75', font: { size: 10 } },
+        },
+        xShort: {
+          type: 'linear', position: 'bottom',
+          grid: { display: false }, border: { display: false },
+          ticks: { color: SHORT_LINE, font: { family: "'DM Mono', monospace", size: 10 },
+                   callback: v => v + '%', maxTicksLimit: 6 },
+          title: { display: true, text: '沽空率 %', color: SHORT_LINE, font: { size: 10 } },
+        },
+        xCcass: {
+          type: 'linear', position: 'bottom',
+          grid: { display: false }, border: { display: false }, offset: true,
+          ticks: { color: CCASS_LINE, font: { family: "'DM Mono', monospace", size: 10 },
+                   callback: v => (v >= 0 ? '+' : '') + v + 'M', maxTicksLimit: 6 },
+          title: { display: true, text: 'CCASS Δ (M股)', color: CCASS_LINE, font: { size: 10 } },
+        },
+      }
+    }
+  });
+}
+// ── TABLE ──────────────────────────────────────────────────────────────────
+const IND_STYLE = {
+  'ETF':    'background:rgba(124,106,255,0.15);color:#b8aaff',
+  '科技':   'background:rgba(77,159,255,0.15);color:#7db8ff',
+  '軟件服務':'background:rgba(77,159,255,0.10);color:#7db8ff',
+  '銀行':   'background:rgba(61,255,160,0.10);color:#5fffb8',
+  '金融':   'background:rgba(61,255,160,0.10);color:#5fffb8',
+  '保險':   'background:rgba(61,255,160,0.08);color:#5fffb8',
+  '能源':   'background:rgba(255,179,71,0.12);color:#ffc97a',
+  '公用事業':'background:rgba(255,179,71,0.10);color:#ffc97a',
+  '電訊':   'background:rgba(255,179,71,0.08);color:#ffc97a',
+  '地產':   'background:rgba(255,140,102,0.12);color:#ffaa88',
+  '工業':   'background:rgba(255,140,102,0.10);color:#ffaa88',
+  '金屬礦產':'background:rgba(255,140,102,0.08);color:#ffaa88',
+  '汽車':   'background:rgba(240,192,64,0.12);color:#f0d080',
+  '零售消費':'background:rgba(240,192,64,0.10);color:#f0d080',
+  '醫療':   'background:rgba(196,181,253,0.15);color:#c4b5fd',
+  '運輸':   'background:rgba(160,180,200,0.12);color:#a0b4c8',
+  '綜合企業':'background:rgba(160,180,200,0.10);color:#a0b4c8',
+  '其他':   'background:rgba(136,135,128,0.12);color:#9aa0b0',
+};
+
+function insightStyle(insight) {
+  if (!insight) return { chip:'chip-green', badge:'badge-green' };
+  if (insight.includes('異常高沽空'))  return { chip:'chip-red',   badge:'badge-red'   };
+  if (insight.includes('空頭平倉'))    return { chip:'chip-amber', badge:'badge-amber' };
+  if (insight.includes('機構增持'))    return { chip:'chip-blue',  badge:'badge-blue'  };
+  if (insight.includes('北水流入'))    return { chip:'chip-green', badge:'badge-green' };
+  if (insight.includes('北水流出'))    return { chip:'chip-red',   badge:'badge-red'   };
+  return { chip:'chip-green', badge:'badge-green' };
+}
+
+function deltaClass(n) {
+  return n > 0 ? 'pos' : n < 0 ? 'neg' : 'neu';
+}
+
+function shortClass(x) {
+  // colour short ratio cell relative to stock type's normal ceiling
+  const ceilings = { etf:70, stable:10, bluechip:20, general:25 };
+  const ceil = ceilings[x.stock_type] || 25;
+  if (x.short_ratio > ceil + 15) return 'neg';
+  if (x.short_ratio > ceil)      return 'neg' ;
+  return '';
+}
+
+function rankTag(x) {
+  if (x.rank_new)          return `<span class="rank-new">new</span>`;
+  if (x.rank_change >= 10) return `<span class="rank-up big">↑${x.rank_change}</span>`;
+  if (x.rank_change >= 3)  return `<span class="rank-up">↑${x.rank_change}</span>`;
+  if (x.rank_change <= -3) return `<span class="rank-down">↓${Math.abs(x.rank_change)}</span>`;
+  return '';
+}
+
+function renderTable(s) {
+  const mob = window.innerWidth < 600;
+  const rows = s.map(x => {
+    const dc  = deltaClass(x.ccass_delta);
+    const ac  = deltaClass(x.ccass_avg5);
+    const sc  = shortClass(x);
+    const tv  = x.turnover >= 1e9
+      ? (x.turnover/1e9).toFixed(2)+'B'
+      : (x.turnover/1e6).toFixed(0)+'M';
+    const { badge } = insightStyle(x.insight);
+    const consec    = x.ccass_consec || 0;
+    const consecStr = consec === 0 ? '<span style="color:var(--dim)">—</span>'
+      : `<span class="${consec > 0 ? 'pos' : 'neg'}" title="CCASS T+2: 反映 ${x.ccass_trade_date||''} 的交易">${consec > 0 ? '+' : ''}${consec}s</span>`;
+    // On mobile: show code only in name cell, hide non-essential columns
+    const nameCell = mob
+      ? `${x.code}${rankTag(x)}`
+      : `${zhName(x.code, x.name_chi || x.name)}${rankTag(x)}`;
+    const indZh     = x.industry_zh || '其他';
+    const typeStyle = IND_STYLE[indZh] || IND_STYLE['其他'];
+    const dimCls    = activeIndustry && activeIndustry !== indZh ? ' ind-dim' : '';
+    return `
+      <tr data-ind="${indZh}" class="${dimCls}">
+        <td class="code-cell">${x.code}</td>
+        <td style="max-width:${mob?'80px':'140px'};overflow:hidden;text-overflow:ellipsis">${nameCell}</td>
+        <td class="col-hide-mobile"><span style="font-size:10px;padding:2px 6px;border-radius:4px;${typeStyle}">${indZh}</span></td>
+        <td class="mono">${tv}</td>
+        <td class="mono ${sc}">${x.short_ratio.toFixed(1)}%</td>
+        <td class="mono col-hide-mobile" style="color:var(--dim)">${x.short_avg5.toFixed(1)}%</td>
+        <td class="mono col-hide-mobile" title="T-2 沽空率 (${x.ccass_trade_date||''})">${x.short_ratio_t2 != null ? x.short_ratio_t2.toFixed(1)+'%' : '—'}</td>
+        <td class="mono col-hide-mobile" style="color:${x.sb_net>0?'var(--green)':x.sb_net<0?'var(--red)':'var(--dim)'}">
+          ${x.sb_net ? (x.sb_net>0?'+':'')+(x.sb_net/1e6).toFixed(0)+'M' : '<span style="color:var(--dim)">—</span>'}
+        </td>
+        <td class="mono ${dc}">${fmtSh(x.ccass_delta)}</td>
+        <td class="mono col-hide-mobile ${ac}">${fmtSh(x.ccass_avg5)}</td>
+        <td class="mono col-hide-mobile">${consecStr}</td>
+        <td>${x.insight ? `<span class="badge ${badge}">${x.insight}</span>` : '<span style="color:var(--dim)">—</span>'}</td>
+      </tr>
+    `;
+  }).join('');
+
+  document.getElementById('tbl-wrap').innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>代號</th>
+          <th>名稱</th>
+          <th class="col-hide-mobile">類型</th>
+          <th>成交額</th>
+          <th>沽空率</th>
+          <th class="col-hide-mobile">5日均</th>
+          <th class="col-hide-mobile" title="CCASS T+2 對應日沽空率">T-2沽空</th>
+          <th class="col-hide-mobile">南向淨</th>
+          <th>CCASS Δ</th>
+          <th class="col-hide-mobile">均Δ×10</th>
+          <th class="col-hide-mobile" title="連續結算日 (每日=2交易日)">連續(s)</th>
+          <th>信號</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+}
+
+// ── TABLE TOGGLE ───────────────────────────────────────────────────────────
+function toggleTable(show) {
+  const body   = document.getElementById('tbl-body');
+  const layout = document.querySelector('.main-layout');
+  const label  = document.querySelector('.switch-wrap span');
+  body.style.display = show ? 'flex' : 'none';
+  body.style.flex = show ? '1' : '';
+  body.style.flexDirection = show ? 'column' : '';
+  body.style.overflow = show ? 'hidden' : '';
+  layout.style.gridTemplateColumns = show ? '' : '1fr';
+  if (label) label.textContent = show ? '顯示' : '隱藏';
+}
+
+// Default: table hidden, chart full width
+document.querySelector('.main-layout').style.gridTemplateColumns = '1fr';
+
+// ── INIT ───────────────────────────────────────────────────────────────────
+setInterval(load, 300000);
+load();
+</script>
+</body>
+</html>
