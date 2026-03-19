@@ -1,0 +1,175 @@
+name: Daily Sync
+
+on:
+  schedule:
+    - cron: '0 12 * * 1-5'   # 12:00 UTC / 20:00 HKT (Mon–Fri)
+    - cron: '0 2 * * 6'       # 02:00 UTC / 10:00 HKT (Saturday)
+  workflow_dispatch:
+    inputs:
+      job:
+        description: 'Which job to run'
+        required: true
+        default: 'daily'
+        type: choice
+        options:
+          - daily
+          - sfc-weekly
+          - di-weekly
+          - both-weekly
+          - ccass-build      # full 12-month CCASS build (run multiple times)
+          - sc-top10-build   # full Stock Connect top10 build (run multiple times)
+
+jobs:
+
+  # ── Daily analysis (Mon–Fri 20:00 HKT) ─────────────────────────────────────
+  daily:
+    name: Daily analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    if: |
+      (github.event_name == 'schedule' && github.event.schedule == '0 12 * * 1-5') ||
+      (github.event_name == 'workflow_dispatch' && inputs.job == 'daily')
+
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - uses: actions/setup-python@v5.6.0
+        with: { python-version: '3.11', cache: 'pip' }
+      - run: pip install -r requirements.txt
+
+      - name: Update Stock Connect top10 (today only)
+        run: python sc_top10_library.py --update
+
+      - name: Run daily analysis
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          CHAT_ID: ${{ secrets.CHAT_ID }}
+        run: python main.py
+
+      - name: Commit
+        run: |
+          git config --global user.name "Bot"
+          git config --global user.email "bot@github.com"
+          for f in data.json rank_history.json name_map.json; do
+            [ -f "$f" ] && git add "$f"
+          done
+          for f in ccass_20*.json sc_top10_20*.json short_20*.json turnover_20*.json; do
+            [ -f "$f" ] && git add "$f"
+          done
+          git diff --staged --quiet || \
+            (git commit -m "Update data: $(date +'%Y-%m-%d %H:%M')" && git push)
+
+  # ── CCASS full build (manual, resume-able) ───────────────────────────────────
+  ccass-build:
+    name: CCASS full 12-month build
+    runs-on: ubuntu-latest
+    timeout-minutes: 320
+    permissions:
+      contents: write
+    if: |
+      github.event_name == 'workflow_dispatch' && inputs.job == 'ccass-build'
+
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - uses: actions/setup-python@v5.6.0
+        with: { python-version: '3.11', cache: 'pip' }
+      - run: pip install -r requirements.txt
+      - name: Build CCASS library (resumes from last saved date)
+        run: python ccass_library.py
+      - name: Commit progress
+        run: |
+          git config --global user.name "Bot"
+          git config --global user.email "bot@github.com"
+          for f in ccass_20*.json; do [ -f "$f" ] && git add "$f"; done
+          git diff --staged --quiet || \
+            (git commit -m "CCASS build: $(date +'%Y-%m-%d %H:%M')" && git push)
+
+  # ── Stock Connect top10 full build (manual, resume-able) ─────────────────────
+  sc-top10-build:
+    name: Stock Connect top10 full build
+    runs-on: ubuntu-latest
+    timeout-minutes: 320
+    permissions:
+      contents: write
+    if: |
+      github.event_name == 'workflow_dispatch' && inputs.job == 'sc-top10-build'
+
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - uses: actions/setup-python@v5.6.0
+        with: { python-version: '3.11', cache: 'pip' }
+      - run: pip install -r requirements.txt
+      - name: Build Stock Connect top10 library (resumes from last saved date)
+        run: python sc_top10_library.py
+      - name: Commit progress
+        run: |
+          git config --global user.name "Bot"
+          git config --global user.email "bot@github.com"
+          for f in sc_top10_20*.json; do [ -f "$f" ] && git add "$f"; done
+          git diff --staged --quiet || \
+            (git commit -m "SC top10 build: $(date +'%Y-%m-%d %H:%M')" && git push)
+
+  # ── SFC weekly (Saturday 10:00 HKT) ─────────────────────────────────────────
+  sfc-weekly:
+    name: SFC weekly short position library
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    if: |
+      (github.event_name == 'schedule' && github.event.schedule == '0 2 * * 6') ||
+      (github.event_name == 'workflow_dispatch' && (inputs.job == 'sfc-weekly' || inputs.job == 'both-weekly'))
+
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - uses: actions/setup-python@v5.6.0
+        with: { python-version: '3.11', cache: 'pip' }
+      - run: pip install -r requirements.txt
+      - name: Restore SFC cache
+        uses: actions/cache@v4
+        with:
+          path: sfc_cache
+          key: sfc-cache-${{ github.run_id }}
+          restore-keys: sfc-cache-
+      - name: Update SFC library
+        run: python sfc_library.py --update
+      - name: Commit
+        run: |
+          git config --global user.name "Bot"
+          git config --global user.email "bot@github.com"
+          for f in sfc_20*.json; do [ -f "$f" ] && git add "$f"; done
+          git diff --staged --quiet || \
+            (git commit -m "SFC weekly: $(date +'%Y-%m-%d')" && git push)
+
+  # ── DI weekly (Saturday 10:00 HKT) ──────────────────────────────────────────
+  di-weekly:
+    name: DI substantial shareholder library
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write
+    if: |
+      (github.event_name == 'schedule' && github.event.schedule == '0 2 * * 6') ||
+      (github.event_name == 'workflow_dispatch' && (inputs.job == 'di-weekly' || inputs.job == 'both-weekly'))
+
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - uses: actions/setup-python@v5.6.0
+        with: { python-version: '3.11', cache: 'pip' }
+      - run: pip install -r requirements.txt
+      - name: Restore DI cache
+        uses: actions/cache@v4
+        with:
+          path: di_cache
+          key: di-cache-${{ github.run_id }}
+          restore-keys: di-cache-
+      - name: Update DI library
+        run: python di_library.py --update
+      - name: Commit
+        run: |
+          git config --global user.name "Bot"
+          git config --global user.email "bot@github.com"
+          for f in di_20*.json; do [ -f "$f" ] && git add "$f"; done
+          git diff --staged --quiet || \
+            (git commit -m "DI weekly: $(date +'%Y-%m-%d')" && git push)
