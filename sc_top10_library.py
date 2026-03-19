@@ -47,7 +47,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 log = logging.getLogger(__name__)
 
 BASE_URL   = "https://www.hkex.com.hk/chi/csm/DailyStat/data_tab_daily_{date}c.js"
-START_DATE = date(2022, 1, 1)
+START_DATE = date(2025, 9, 1)
 SLEEP_SEC  = 1.2
 CACHE_DIR  = "sc_cache"
 os.makedirs(CACHE_DIR, exist_ok=True)
