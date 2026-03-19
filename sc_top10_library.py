@@ -47,7 +47,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 log = logging.getLogger(__name__)
 
 BASE_URL   = "https://www.hkex.com.hk/chi/csm/DailyStat/data_tab_daily_{date}c.js"
-START_DATE = date(2018, 3, 1)
+START_DATE = date(2022, 1, 1)
 SLEEP_SEC  = 1.2
 CACHE_DIR  = "sc_cache"
 os.makedirs(CACHE_DIR, exist_ok=True)
@@ -311,6 +311,9 @@ def build(update_only: bool = False):
         by_year.setdefault(d.year, []).append(d)
 
     missing = []
+    consec_404 = 0
+    MAX_CONSEC_404 = 30   # stop if 30 consecutive days 404 — hit archive limit
+
     for year, days in sorted(by_year.items()):
         lib = load_year(year)
         log.info("── Year %d: %d days ──", year, len(days))
@@ -322,13 +325,23 @@ def build(update_only: bool = False):
                 names = ", ".join(s["code"] for s in top[:3])
                 log.info("  [%d/%d] %s  %d stocks  top: %s",
                          i, len(days), d.isoformat(), len(top), names)
+                consec_404 = 0
             else:
                 missing.append(d)
-                log.warning("  [%d/%d] %s  no data", i, len(days), d.isoformat())
+                consec_404 += 1
+                log.warning("  [%d/%d] %s  no data (%d consec)", i, len(days), d.isoformat(), consec_404)
+                if consec_404 >= MAX_CONSEC_404:
+                    log.warning("  %d consecutive 404s — HKEX archive limit reached, stopping", MAX_CONSEC_404)
+                    save_year(year, lib)
+                    break
             time.sleep(SLEEP_SEC)
             if i % 20 == 0:
                 save_year(year, lib)
+        else:
+            save_year(year, lib)
+            continue
         save_year(year, lib)
+        break   # break outer loop too
 
     log.info("── Done ──")
     if missing:
