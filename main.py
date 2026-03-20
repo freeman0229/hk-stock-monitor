@@ -376,13 +376,12 @@ def get_ccass_delta_and_avg(stock_codes: list, today_map: dict,
     today_pct_map: {code: pct_listed} for today, from df_ccass.
 
     Fields returned:
-      pct_listed   — today's % held in CCASS (from HKEX)
-      pct_delta    — today pct minus yesterday pct (percentage points)
-      pct_avg5     — avg pct_delta over last 5 days (direction + magnitude)
-      pct_avg20    — avg pct_listed over last 20 days (longer-term baseline)
-      ccass_consec — consecutive days pct moved in same direction as today
-                     (positive = accumulating streak, negative = distributing)
-      ccass_delta  — raw share count change (kept for internal signal thresholds)
+      pct_listed    — today's % held in CCASS (from HKEX)
+      pct_delta     — today pct minus yesterday pct (percentage points)
+      ccass_consec  — consecutive days pct moved in same direction as today
+                      (positive = accumulating streak, negative = distributing)
+      ccass_streak_pct — cumulative pct change over the current streak
+      ccass_delta   — raw share count change (kept for internal use)
     """
     if today_pct_map is None:
         today_pct_map = {}
@@ -403,13 +402,6 @@ def get_ccass_delta_and_avg(stock_codes: list, today_map: dict,
             for i in range(len(pct_hist) - 1)
             if pct_hist[i] > 0 and pct_hist[i + 1] > 0
         ]
-
-        # avg of last 5 daily pct changes (includes today's delta as most recent)
-        recent = ([pct_delta] + pct_deltas)[:5]
-        pct_avg5  = round(sum(recent) / len(recent), 4) if recent else None
-
-        # 20-day average pct_listed level (baseline)
-        pct_avg20 = round(sum(pct_hist[:20]) / len(pct_hist[:20]), 4) if len(pct_hist) >= 20 else None
 
         # consecutive days pct moved in same direction as today
         # flat days (delta == 0) are skipped — they don't break the streak
@@ -433,14 +425,12 @@ def get_ccass_delta_and_avg(stock_codes: list, today_map: dict,
         delta   = today_sh - prev_sh
 
         rows.append({
-            "stock_code":      code,
-            "ccass_delta":     delta,
-            "ccass_consec":    consec,
+            "stock_code":       code,
+            "ccass_delta":      delta,
+            "ccass_consec":     consec,
             "ccass_streak_pct": round(streak_pct, 4),
-            "pct_listed":      pct_today,
-            "pct_delta":       pct_delta,
-            "pct_avg5":        pct_avg5,
-            "pct_avg20":       pct_avg20,
+            "pct_listed":       pct_today,
+            "pct_delta":        pct_delta,
         })
     return pd.DataFrame(rows)
 
