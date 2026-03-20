@@ -22,8 +22,7 @@ Structure:
                        "trades":  990929, "etf": 1661.55},
       "top10": [
         {"code": "09988", "name": "阿里巴巴－Ｗ",
-         "buy":  4736016460, "sell": 8195273431, "total": 12931289891,
-         "rank": 1, "rank_sse": 1, "rank_szse": 1},
+         "buy":  7696344830, "sell": 5659571687, "total": 13355916517},
         ...
       ]
     }
@@ -230,53 +229,30 @@ def parse_js(text: str) -> dict | None:
                 for s in _parse_top10(tbl, is_southbound=True):
                     szse_stocks[s["code"]] = s
 
-    # Combine SSE + SZSE: sum buy/sell/total per code, preserve per-exchange ranks.
-    # Iterate each exchange separately so we know exactly which list each stock
-    # came from — avoids the broken `is` identity check.
+    # Combine SSE + SZSE: sum buy/sell/total per code.
+    # Same stock can appear on both lists — just add the numbers together.
     merged = {}
-
-    for code, s in sse_stocks.items():
+    for s in list(sse_stocks.values()) + list(szse_stocks.values()):
+        code = s["code"]
         if code not in merged:
             merged[code] = {"code": code, "name": s["name"],
-                            "buy": 0, "sell": 0, "total": 0, "rank": 99,
-                            "rank_sse": None, "rank_szse": None}
-        merged[code]["buy"]      += s["buy"]
-        merged[code]["sell"]     += s["sell"]
-        merged[code]["total"]    += s["total"]
-        merged[code]["rank"]      = min(merged[code]["rank"], s["rank"])
-        merged[code]["rank_sse"]  = s["rank"]   # always set — this IS an SSE stock
+                            "buy": 0, "sell": 0, "total": 0}
+        merged[code]["buy"]   += s["buy"]
+        merged[code]["sell"]  += s["sell"]
+        merged[code]["total"] += s["total"]
 
-    for code, s in szse_stocks.items():
-        if code not in merged:
-            merged[code] = {"code": code, "name": s["name"],
-                            "buy": 0, "sell": 0, "total": 0, "rank": 99,
-                            "rank_sse": None, "rank_szse": None}
-        merged[code]["buy"]       += s["buy"]
-        merged[code]["sell"]      += s["sell"]
-        merged[code]["total"]     += s["total"]
-        merged[code]["rank"]       = min(merged[code]["rank"], s["rank"])
-        merged[code]["rank_szse"]  = s["rank"]  # always set — this IS a SZSE stock
-
-    # Minimum sanity check — HKEX publishes exactly 10 per exchange so we
-    # should always have 10–20 unique stocks. Fewer means parse dropped rows.
+    # Sanity check
     n_sse, n_szse, n_merged = len(sse_stocks), len(szse_stocks), len(merged)
     if n_sse < 10:
-        log.warning("parse_js: only %d SSE stocks parsed (expected 10) — table structure may have changed", n_sse)
+        log.warning("parse_js: only %d SSE stocks (expected 10) — table structure may have changed", n_sse)
     if n_szse < 10:
-        log.warning("parse_js: only %d SZSE stocks parsed (expected 10) — table structure may have changed", n_szse)
+        log.warning("parse_js: only %d SZSE stocks (expected 10) — table structure may have changed", n_szse)
     if n_merged < 10:
-        log.warning("parse_js: merged list has only %d stocks (expected ≥10)", n_merged)
+        log.warning("parse_js: only %d unique stocks after merge (expected ≥10)", n_merged)
     log.info("parse_js: SSE=%d SZSE=%d merged=%d (overlap=%d)",
              n_sse, n_szse, n_merged, n_sse + n_szse - n_merged)
 
-    # Set the compat `rank` field = best single-exchange rank (for main.py sb_rank).
-    # Must be done AFTER both exchange loops so both rank_sse and rank_szse are set.
-    for v in merged.values():
-        sse_r  = v["rank_sse"]  if v["rank_sse"]  is not None else 99
-        szse_r = v["rank_szse"] if v["rank_szse"] is not None else 99
-        v["rank"] = min(sse_r, szse_r)
-
-    # Sort by combined total turnover descending.
+    # Sort by combined total descending
     result["top10"] = sorted(merged.values(), key=lambda x: x["total"], reverse=True)
     return result
 
@@ -432,12 +408,8 @@ def query_date(ds: str):
     print(f"\n{'Rank':<5} {'Code':<7} {'Name':<14} {'Buy':>12} {'Sell':>12} {'Total':>12} {'SSE':>4} {'SZ':>4}")
     print("─" * 72)
     for i, s in enumerate(rec.get("top10", []), 1):
-        r_sse  = s.get("rank_sse")
-        r_szse = s.get("rank_szse")
         print(f"{i:<5} {s['code']:<7} {s['name']:<14} "
-              f"{fmt(s['buy']):>12} {fmt(s['sell']):>12} {fmt(s['total']):>12} "
-              f"{'#'+str(r_sse)  if r_sse  else '-':>4} "
-              f"{'#'+str(r_szse) if r_szse else '-':>4}")
+              f"{fmt(s['buy']):>12} {fmt(s['sell']):>12} {fmt(s['total']):>12}")
 
 
 # ── API for main.py ───────────────────────────────────────────────────────────

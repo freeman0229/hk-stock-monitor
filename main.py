@@ -650,13 +650,10 @@ def run_analysis():
         m = {}
         for s in top10_list:
             m[s["code"]] = {
-                "sb_buy":    s["buy"],
-                "sb_sell":   s["sell"],
-                "sb_net":    s["buy"] - s["sell"],
-                "sb_rank":   s.get("rank", 0),
-                "sb_total":  s.get("total", 0),
-                "sb_rank_sse":  s.get("rank_sse"),
-                "sb_rank_szse": s.get("rank_szse"),
+                "sb_buy":   s["buy"],
+                "sb_sell":  s["sell"],
+                "sb_net":   s["buy"] - s["sell"],
+                "sb_total": s.get("total", 0),
             }
         return m
 
@@ -812,13 +809,10 @@ def run_analysis():
             "code": code, "name": row.name, "name_chi": getattr(row, "name_chi", row.name),
             "stock_type": stock_type, "industry_zh": ind_zh,
             "turnover": int(row.turnover),
-            "sb_buy":      sb.get("sb_buy",   0),
-            "sb_sell":     sb.get("sb_sell",  0),
-            "sb_net":      sb.get("sb_net",   0),
-            "sb_rank":     sb.get("sb_rank",  0),
-            "sb_total":    sb.get("sb_total", 0),
-            "sb_rank_sse":  sb.get("sb_rank_sse"),
-            "sb_rank_szse": sb.get("sb_rank_szse"),
+            "sb_buy":   sb.get("sb_buy",   0),
+            "sb_sell":  sb.get("sb_sell",  0),
+            "sb_net":   sb.get("sb_net",   0),
+            "sb_total": sb.get("sb_total", 0),
             "sb_net_prev": int(sb_prev_map.get(code, 0)),
             "sb_consec":   int(sb_consec_map.get(code, 0)),
             "short_ratio": round(short_ratio, 2), "short_avg5": round(short_avg5, 2),
