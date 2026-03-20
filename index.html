@@ -458,16 +458,14 @@ tbody td { padding: 9px 12px; vertical-align: middle; }
     <div class="sec-title">北水淨流入 — 綜合對比</div>
     <div class="sec-sub">按淨流入額排序 ｜ 數據來源：CCASS</div>
   </div>
-  <div class="tbl-wrap" style="padding:16px 12px 12px;">
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:6px;padding:16px 12px 12px;margin-bottom:16px;overflow:visible;">
     <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px;font-size:12px;color:var(--muted);">
       <span style="display:flex;align-items:center;gap:5px;"><span style="display:inline-block;width:28px;height:4px;background:#c0252d;border-radius:2px;"></span>淨買入</span>
       <span style="display:flex;align-items:center;gap:5px;"><span style="display:inline-block;width:28px;height:4px;background:#1a7a3c;border-radius:2px;"></span>淨賣出</span>
       <span style="display:flex;align-items:center;gap:5px;"><span style="display:inline-block;width:10px;height:10px;background:#e8a020;border-radius:50%;"></span>CCASS持續買入</span>
       <span style="display:flex;align-items:center;gap:5px;"><span style="display:inline-block;width:10px;height:10px;background:var(--muted);border-radius:50%;opacity:.5"></span>CCASS持續賣出</span>
     </div>
-    <div style="overflow-x:auto;">
-      <canvas id="sbChart" style="display:block;width:100%;"></canvas>
-    </div>
+    <canvas id="sbChart" style="display:block;max-width:100%;"></canvas>
   </div>
 
   <!-- Toggle button -->
@@ -801,13 +799,16 @@ function drawSbChart(sorted) {
   if (!stocks.length) return;
   const ROW_H = 36, PAD_LEFT = 160, PAD_RIGHT = 100, PAD_TOP = 12, PAD_BOT = 24;
 
-  // Use the panel width, not just the canvas parent
+  // Get width from the panel itself — always has a real rendered width
   const panel = document.getElementById('panel-bshui');
-  const W = (panel ? panel.offsetWidth : 0) - 32 || 700;
+  const W = Math.max(400, (panel ? panel.offsetWidth : window.innerWidth) - 40);
   const H = PAD_TOP + stocks.length * ROW_H + PAD_BOT;
-  canvas.width = W; canvas.height = H;
+
+  // Set both the canvas coordinate space AND its displayed size
+  canvas.width  = W;
+  canvas.height = H;
+  canvas.style.width  = W + 'px';
   canvas.style.height = H + 'px';
-  canvas.style.width  = '100%';
   const ctx = canvas.getContext('2d');
   ctx.clearRect(0, 0, W, H);
 
@@ -941,8 +942,8 @@ function renderBshui() {
     return { ...s, sb_rank_change: sbRankChange };
   }).sort((a,b) => (a.rank || 999) - (b.rank || 999));
 
-  // Defer draw to next frame so DOM has correct dimensions
-  requestAnimationFrame(() => drawSbChart(sortedWithRankChange));
+  // Defer draw — give browser time to lay out the panel fully
+  setTimeout(() => drawSbChart(sortedWithRankChange), 50);
 
   // Build table rows
   const html = display.slice(0,50).map((s,i) => {
@@ -1275,10 +1276,10 @@ setInterval(updateTicker, 60000);
 document.getElementById('hdr-time').textContent = new Date().toLocaleString('zh-HK');
 loadData();
 window.addEventListener('resize', () => {
-  requestAnimationFrame(() => {
+  setTimeout(() => {
     if (document.querySelector('.tab-btn[data-tab="cai"]').classList.contains('active')) drawCai();
     if (document.querySelector('.tab-btn[data-tab="bshui"]').classList.contains('active')) renderBshui();
-  });
+  }, 50);
 });
 </script>
 </body>
