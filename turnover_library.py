@@ -27,6 +27,8 @@ from datetime import date, datetime
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger(__name__)
 
+START_DATE = date(2018, 3, 1)
+
 
 # ── File I/O ──────────────────────────────────────────────────────────────────
 
@@ -34,13 +36,7 @@ def lib_path(year: int) -> str:
     return f"turnover_{year}.json"
 
 def all_years() -> list:
-    years = set()
-    for f in os.listdir("."):
-        if f.startswith("turnover_") and f.endswith(".json"):
-            try: years.add(int(f[9:13]))
-            except: pass
-    years.add(date.today().year)
-    return sorted(years)
+    return list(range(START_DATE.year, date.today().year + 1))
 
 def load_year(year: int) -> dict:
     p = lib_path(year)
@@ -191,19 +187,6 @@ def get_tv_history(code: str, n: int, before: str) -> list:
             if len(result) >= n:
                 return result
     return result
-
-
-def get_day_records(ds: str) -> dict:
-    """
-    Return full {code: {tv, vol}} dict for a date (YYYY-MM-DD).
-    Used to load the full store for avg computations.
-    """
-    year = int(ds[:4])
-    p    = lib_path(year)
-    if not os.path.exists(p):
-        return {}
-    with open(p, encoding="utf-8") as f:
-        return json.load(f).get("by_date", {}).get(ds, {})
 
 
 def load_recent(n_days: int, before: str) -> dict:

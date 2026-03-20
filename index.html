@@ -717,7 +717,7 @@ try {
   if (cc) {
     const parsed = JSON.parse(cc);
     // Only use cache if it has real non-zero data
-    if (parsed.length && parsed.some(s => s.sb_net !== 0)) {
+    if (parsed.length && parsed.some(s => s.sb_buy > 0 || s.sb_sell > 0)) {
       lastChartData = parsed;
     } else {
       localStorage.removeItem(CHART_CACHE_KEY);
@@ -734,9 +734,9 @@ function applyData(d, stale) {
     updateTime ? '更新: ' + updateTime + staleMark : '';
 
   // Data sanity check
-  const sbStocks = allStocks.filter(s => s.sb_net !== 0);
-  if (sbStocks.length > 25) {
-    console.warn(`[data check] sb_net populated for ${sbStocks.length} stocks — expected ≤20 (Stock Connect top-10/20). Check sc_top10_library output.`);
+  const sbStocks = allStocks.filter(s => s.sb_buy > 0 || s.sb_sell > 0);
+  if (sbStocks.length > 40) {
+    console.warn(`[data check] ${sbStocks.length} stocks have southbound flow — unexpectedly high. Check sc_top10_library output.`);
   }
   const missingPct = allStocks.filter(s => s.pct_listed == null || s.pct_listed === 0).length;
   if (missingPct > allStocks.length * 0.5) {
@@ -863,13 +863,12 @@ function drawSbChart(sorted) {
   if (!canvas) return;
 
   const layout = getLayout();
-  const maxStocks = layout === 'portrait' ? 10 : layout === 'landscape' ? 15 : 30;
   const ROW_H    = layout === 'portrait' ? 44 : layout === 'landscape' ? 32 : 36;
   const PAD_LEFT = layout === 'portrait' ? 110 : layout === 'landscape' ? 130 : 160;
   const PAD_RIGHT= layout === 'portrait' ? 70  : layout === 'landscape' ? 80  : 100;
   const PAD_TOP  = 12, PAD_BOT = 24;
 
-  const stocks = sorted.slice(0, maxStocks);
+  const stocks = sorted;
   if (!stocks.length) return;
 
   const W = Math.max(300, window.innerWidth - 48);
@@ -987,10 +986,10 @@ function drawSbChart(sorted) {
 }
 
 function renderBshui() {
-  // Only stocks with actual sb flow data (Stock Connect top-10/20)
-  const sorted = [...allStocks].filter(s => s.sb_net !== 0).sort((a,b) => b.sb_net - a.sb_net);
-  console.log(`[bshui] allStocks=${allStocks.length} sb_nonzero=${sorted.length} sample_sb_net=${allStocks[0]?.sb_net}`);
-  const display = sorted.slice(0, 20);
+  // All stocks with any southbound flow (buy or sell), sorted by net flow descending
+  const sorted = [...allStocks].filter(s => s.sb_buy > 0 || s.sb_sell > 0).sort((a,b) => b.sb_net - a.sb_net);
+  console.log(`[bshui] allStocks=${allStocks.length} sb_active=${sorted.length} sample_sb_net=${allStocks[0]?.sb_net}`);
+  const display = sorted;
 
   // No sb data yet — show message, keep last cached chart
   if (!display.length) {
@@ -1051,7 +1050,7 @@ function renderBshui() {
   setTimeout(() => drawSbChart(chartData), 50);
 
   // Build table rows
-  const html = display.slice(0, getTableRows()).map((s,i) => {
+  const html = display.map((s,i) => {
     const netClass = s.sb_net > 0 ? 'up-txt' : 'dn-txt';
     const srClass  = s.short_ratio > s.short_avg5 ? 'up-txt' : '';
     return `<tr>

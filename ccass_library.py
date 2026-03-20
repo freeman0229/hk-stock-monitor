@@ -364,19 +364,6 @@ if __name__ == "__main__":
 
 # ── API for main.py ───────────────────────────────────────────────────────────
 
-def get_date_records(ds: str) -> dict:
-    """
-    Return {code: {sh, pct}} for a single date string (YYYY-MM-DD).
-    Reads from the appropriate year file. Returns {} if not found.
-    """
-    year = int(ds[:4])
-    p    = lib_path(year)
-    if not os.path.exists(p):
-        return {}
-    with open(p, encoding="utf-8") as f:
-        return json.load(f).get("by_date", {}).get(ds, {})
-
-
 def get_pct_history(code: str, n: int, before: str) -> list:
     """
     Return the last n pct_listed values for a stock strictly before date `before`
