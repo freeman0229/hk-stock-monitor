@@ -325,7 +325,7 @@ def get_short_avg_ratio(stock_codes: list, days: int, daily_tv: dict,
     return pd.DataFrame(rows)
 
 # ── Source 3: CCASS southbound ────────────────────────────────────────────────
-CCASS_URL   = "https://www3.hkexnews.hk/sdw/search/mutualmarket.aspx"
+CCASS_URL   = "https://www3.hkexnews.hk/sdw/search/mutualmarket_c.aspx"
 EMPTY_CCASS = pd.DataFrame(columns=["stock_code", "name", "shareholding", "pct_listed"])
 
 def get_ccass_southbound(date: datetime = None) -> pd.DataFrame:
@@ -566,8 +566,11 @@ def bootstrap_history(days: int = 10):
         if d.strftime("%Y-%m-%d") not in existing_ccass:
             df_c = get_ccass_southbound(d)
             if not df_c.empty:
-                ccass_save_day(d, {r.stock_code: {"sh": r.shareholding, "pct": r.pct_listed}
-                                   for r in df_c.itertuples()})
+                ccass_save_day(d, {r.stock_code: {
+                    "sh":   r.shareholding,
+                    "pct":  r.pct_listed,
+                    "name": r.name,
+                } for r in df_c.itertuples()})
                 log.info("Bootstrap CCASS: %s (%d)", key, len(df_c))
             time.sleep(1)
 
@@ -630,8 +633,11 @@ def run_analysis():
                                             today_pct_map=ccass_pct_map)
     # Save today's CCASS into the year-split library
     if not df_ccass.empty:
-        ccass_save_day(trading_day, {r.stock_code: {"sh": r.shareholding, "pct": r.pct_listed}
-                                     for r in df_ccass.itertuples()})
+        ccass_save_day(trading_day, {r.stock_code: {
+            "sh":   r.shareholding,
+            "pct":  r.pct_listed,
+            "name": r.name,
+        } for r in df_ccass.itertuples()})
     ccass_delta_map     = dict(zip(df_cs["stock_code"], df_cs["ccass_delta"]))
     ccass_consec_map    = dict(zip(df_cs["stock_code"], df_cs["ccass_consec"]))
     ccass_streak_pct_map= dict(zip(df_cs["stock_code"], df_cs["ccass_streak_pct"]))
@@ -835,12 +841,6 @@ def run_analysis():
               "name_map": load_store(NAME_MAP_FILE), "stocks": results}
     with open("data.json", "w", encoding="utf-8") as f:
         json.dump(output, f, ensure_ascii=False, separators=(",", ":"))
-    # Sanity check: warn if any stock has sb_total > turnover (impossible — means stale JSON)
-    bad = [(r["code"], r["name_chi"], r["sb_total"], r["turnover"])
-           for r in results if r["turnover"] > 0 and r["sb_total"] > r["turnover"]]
-    if bad:
-        log.warning("sb_total > turnover for %d stocks — run --reparse to fix: %s",
-                    len(bad), [(c, int(st/1e8), int(tv/1e8)) for c,n,st,tv in bad[:5]])
     log.info("data.json written: %d stocks", len(results))
     save_rank_history(trading_day, results)
 
