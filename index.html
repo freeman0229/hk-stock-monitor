@@ -707,8 +707,8 @@ function miniBar(val, max, cls) {
 }
 
 // ── Load data.json ────────────────────────────────────────────────────────
-const CACHE_KEY = 'hk_dashboard_data';
-const CHART_CACHE_KEY = 'hk_chart_data';
+const CACHE_KEY = 'hk_dashboard_data_v2';   // bump version to bust old cache
+const CHART_CACHE_KEY = 'hk_chart_data_v2';
 
 // Restore last chart data immediately so chart renders on first paint
 try {
@@ -760,7 +760,7 @@ async function loadData() {
 
   // 2. Fetch fresh data in background
   try {
-    const r = await fetch('data.json?t=' + Date.now());  // bust cache
+    const r = await fetch('data.json', { cache: 'no-cache' });
     if (!r.ok) throw new Error(r.status);
     const d = await r.json();
     localStorage.setItem(CACHE_KEY, JSON.stringify(d));  // save for next load
@@ -988,6 +988,7 @@ function drawSbChart(sorted) {
 function renderBshui() {
   // Only stocks with actual sb flow data (Stock Connect top-10/20)
   const sorted = [...allStocks].filter(s => s.sb_net !== 0).sort((a,b) => b.sb_net - a.sb_net);
+  console.log(`[bshui] allStocks=${allStocks.length} sb_nonzero=${sorted.length} sample_sb_net=${allStocks[0]?.sb_net}`);
   const display = sorted.slice(0, 20);
 
   // No sb data yet — show message, keep last cached chart
