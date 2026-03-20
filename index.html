@@ -470,7 +470,7 @@ tbody td { padding: 9px 12px; vertical-align: middle; }
 
   <!-- Chart -->
   <div class="sec-head">
-    <div class="sec-title">北水淨流入 — 綜合對比</div>
+    <div class="sec-title">北水淨流入 — 綜合對比 <span id="sb-stock-count" style="font-size:12px;font-weight:400;color:var(--muted);margin-left:6px"></span></div>
     <div class="sec-sub" id="sb-date-label">按總成交額排序 ｜ 北水佔比 = 北水總成交 ÷ 全市場成交</div>
   </div>
   <div style="background:var(--card);border:1px solid var(--border);border-radius:6px;padding:16px 12px 12px;margin-bottom:16px;overflow:visible;">
@@ -734,9 +734,9 @@ function applyData(d, stale) {
     updateTime ? '更新: ' + updateTime + staleMark : '';
 
   // Data sanity check
-  const sbStocks = allStocks.filter(s => s.sb_buy > 0 || s.sb_sell > 0);
-  if (sbStocks.length > 40) {
-    console.warn(`[data check] ${sbStocks.length} stocks have southbound flow — unexpectedly high. Check sc_top10_library output.`);
+  const sbStocks = allStocks.filter(s => s.sb_buy > 0 || s.sb_sell > 0 || s.sb_total > 0);
+  if (sbStocks.length > 20) {
+    console.warn(`[data check] ${sbStocks.length} SB stocks — max possible is 20 (10 SSE + 10 SZSE). Check sc_top10_library output.`);
   }
   const missingPct = allStocks.filter(s => s.pct_listed == null || s.pct_listed === 0).length;
   if (missingPct > allStocks.length * 0.5) {
@@ -1036,6 +1036,8 @@ function renderBshui() {
     });
   console.log(`[bshui] allStocks=${allStocks.length} sb_active=${sorted.length}`);
   const display = sorted;
+  const countEl = document.getElementById('sb-stock-count');
+  if (countEl) countEl.textContent = display.length ? `(${display.length} 隻)` : '';
 
   // No sb data yet — show message, keep last cached chart
   if (!display.length) {
