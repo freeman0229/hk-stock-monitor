@@ -174,19 +174,24 @@ def get_qualifying_stocks(d: date) -> list:
         pre  = BeautifulSoup(text, "html.parser").find("pre")
         body = pre.get_text() if pre else text
 
-        # Pattern B: CODE NAME CHI CURR PRV BID ASK OPEN HIGH LOW CLOSE SHARES TURNOVER
+        # Pattern B — same as main.py (confirmed working):
+        # Columns: CODE NAME CHI CURR PRV BID ASK OPEN HIGH LOW CLOSE SHARES TURNOVER
+        #           1    2    3   4    5   6   7   8    9   10  11    12     13
+        # group(6) = col 13 = HKD turnover (8+ digits)
         PAT = re.compile(
             r"^[\*\s]{0,5}(\d{1,5})\s+([A-Z][A-Z0-9 \-&'./#+]{1,22}?)\s{2,}"
             r"(.{1,30}?)\s*(?:HKD|USD|CNY|EUR|GBP)\s+"
             r"[\d,.]+\s+[\d,.]+\s+[\d,.]+\s+[\d,.]+\s+[\d,.]+\s+[\d,.]+\s+"
-            r"[\d,.]+\s+[\d,]{5,}\s+([\d,]{8,})\s*$"
+            r"([\d,.]+)\s+"            # col 11: close price
+            r"([\d,]{5,})\s+"          # col 12: shares
+            r"([\d,]{8,})\s*$"         # col 13: HKD turnover
         )
         codes = []
         for line in body.splitlines():
             m = PAT.match(line)
             if not m: continue
             if int(m.group(1)) > 9999: continue
-            if float(m.group(4).replace(",", "")) >= MIN_TURNOVER:
+            if float(m.group(6).replace(",", "")) >= MIN_TURNOVER:
                 codes.append(str(int(m.group(1))).zfill(5))
 
         log.info("Qualifying stocks %s: %d (tv ≥ %s HKD)",
