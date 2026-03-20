@@ -568,7 +568,7 @@ tbody td { padding: 9px 12px; vertical-align: middle; }
           <th class="rank">#</th>
           <th>股票</th>
           <th class="num-r" data-col="ccass_delta">今日持倉變動%</th>
-          <th class="num-r mob-hide" data-col="pct_delta">今日變動%</th>
+          <th class="num-r mob-hide" data-col="ccass_delta">持倉股數變動</th>
           <th class="num-r mob-hide" data-col="ccass_consec">連續日數</th>
           <th class="num-r mob-hide" data-col="turnover">成交額(萬)</th>
           <th>行業</th>
@@ -811,8 +811,10 @@ function generateMockData() {
     const cc  = Math.round(Math.random()*8)-2;
     const insightPool = ['🔥 挾倉高危', '🐉 異常亢奮', '🏦 北水增持', '🚨 北水流出', '🚨 異常高沽空', '📉 空頭平倉', '', '', ''];
     // Mock exchange ranks: dual-listed stocks (i < 8) appear on both; last 2 are single-exchange
-    const mockSbBuy  = sbn > 0 ? Math.round(sbn * 1.2) : 0;
-    const mockSbSell = sbn > 0 ? Math.round(sbn * 0.8) : 0;
+    // Realistic mock: net buy → buy > sell; net sell → sell > buy
+    const absMag = Math.abs(sbn);
+    const mockSbBuy  = sbn > 0 ? Math.round(sbn * 1.2) : (sbn < 0 ? Math.round(absMag * 0.3) : 0);
+    const mockSbSell = sbn > 0 ? Math.round(sbn * 0.8) : (sbn < 0 ? Math.round(absMag * 1.3) : 0);
     const mockTotal  = mockSbBuy + mockSbSell;
     // sb_pct: realistic 5–60% participation for demo stocks; zero for non-SB stocks
     const mockSbPct  = i < SB_TOP ? (10 + Math.random() * 50) : 0;
@@ -957,15 +959,26 @@ function drawSbChart(sorted) {
     const hasSb = s.sb_total > 0 || s.sb_buy > 0 || s.sb_sell > 0;
     const bw = hasSb ? Math.abs(s.sb_net) / maxAbs * (chartW / 2) * 0.92 : 0;
     if (hasSb) {
-      if (s.sb_net >= 0) {
+      if (s.sb_net === 0) {
+        // In SB list but net zero (buy == sell) — draw a visible diamond at zero line
+        const dh = barH * 0.6;
+        ctx.fillStyle = '#888';
+        ctx.beginPath();
+        ctx.moveTo(zeroX,      cy - dh/2);
+        ctx.lineTo(zeroX + 7,  cy);
+        ctx.lineTo(zeroX,      cy + dh/2);
+        ctx.lineTo(zeroX - 7,  cy);
+        ctx.closePath();
+        ctx.fill();
+      } else if (s.sb_net > 0) {
         ctx.fillStyle = '#c0252d';
-        ctx.fillRect(zeroX, cy - barH/2, Math.max(bw, 1), barH);
+        ctx.fillRect(zeroX, cy - barH/2, bw, barH);
       } else {
         ctx.fillStyle = '#1a7a3c';
-        ctx.fillRect(zeroX - Math.max(bw, 1), cy - barH/2, Math.max(bw, 1), barH);
+        ctx.fillRect(zeroX - bw, cy - barH/2, bw, barH);
       }
     } else {
-      // No SB data — draw a subtle centre tick
+      // No SB data — subtle centre tick
       ctx.fillStyle = 'rgba(0,0,0,0.12)';
       ctx.fillRect(zeroX - 1, cy - barH/2, 2, barH);
     }
@@ -985,8 +998,13 @@ function drawSbChart(sorted) {
     ctx.textAlign = 'left';
     ctx.font = '12px "Noto Sans TC", sans-serif';
     if (hasSb) {
-      ctx.fillStyle = s.sb_net >= 0 ? '#c0252d' : '#1a7a3c';
-      ctx.fillText((s.sb_net >= 0 ? '+' : '') + fmtM(s.sb_net), W - PAD_RIGHT + 8, cy);
+      if (s.sb_net === 0) {
+        ctx.fillStyle = '#999';
+        ctx.fillText('±0', W - PAD_RIGHT + 8, cy);
+      } else {
+        ctx.fillStyle = s.sb_net > 0 ? '#c0252d' : '#1a7a3c';
+        ctx.fillText((s.sb_net > 0 ? '+' : '') + fmtM(s.sb_net), W - PAD_RIGHT + 8, cy);
+      }
     } else {
       ctx.fillStyle = '#bbb';
       ctx.fillText('—', W - PAD_RIGHT + 8, cy);
@@ -1004,9 +1022,18 @@ function drawSbChart(sorted) {
 function renderBshui() {
   // Only stocks with SB flow today — sorted by overall market turnover high→low.
   // This answers: "of the stocks mainland money touched, which were biggest by tape?"
+  // Sort: stocks with quotation data by overall turnover desc.
+  // SB-orphan stocks (turnover=0, not in daily quotation) sort by sb_total desc
+  // so they still appear near top alongside other active SB stocks.
   const sorted = [...allStocks]
     .filter(s => s.sb_buy > 0 || s.sb_sell > 0 || s.sb_total > 0)
-    .sort((a, b) => (b.turnover || 0) - (a.turnover || 0));
+    .sort((a, b) => {
+      const ta = a.turnover || 0, tb = b.turnover || 0;
+      if (ta === 0 && tb === 0) return (b.sb_total || 0) - (a.sb_total || 0);
+      if (ta === 0) return 1;   // orphans after quoted stocks
+      if (tb === 0) return -1;
+      return tb - ta;
+    });
   console.log(`[bshui] allStocks=${allStocks.length} sb_active=${sorted.length}`);
   const display = sorted;
 
@@ -1029,9 +1056,9 @@ function renderBshui() {
   const sbLabel  = document.getElementById('sb-date-label');
   if (sbLabel) {
     if (sbDate && sbDate !== todayStr) {
-      sbLabel.innerHTML = `按淨流入額排序 ｜ <span style="color:var(--gold)">⏳ 顯示 ${sbDate} 數據（今日數據尚未發布）</span>`;
+      sbLabel.innerHTML = `按總成交額排序 ｜ <span style="color:var(--gold)">⏳ 顯示 ${sbDate} 數據（今日數據尚未發布）</span>`;
     } else {
-      sbLabel.textContent = '按淨流入額排序 ｜ 數據來源：CCASS';
+      sbLabel.textContent = '按總成交額排序 ｜ 北水佔比 = 北水總成交 ÷ 全市場成交';
     }
   }
 
@@ -1090,14 +1117,14 @@ function renderBshui() {
 
   // Build table rows
   const html = display.map((s,i) => {
-    const netClass = s.sb_net > 0 ? 'up-txt' : 'dn-txt';
+    const netClass = s.sb_net > 0 ? 'up-txt' : s.sb_net < 0 ? 'dn-txt' : 'na-txt';
     const sbPct    = s.turnover > 0 ? (s.sb_total / s.turnover * 100) : 0;
     return `<tr>
       <td class="rank">${i+1}</td>
       <td><span class="name-cell">${s.name_chi}</span><span class="name-zh">${s.code}</span></td>
       <td class="num-r">${fmtM(s.turnover)}</td>
       <td class="num-r">${sbPct > 0 ? sbParticipationBar(sbPct) : '<span class="na-txt">—</span>'}</td>
-      <td class="num-r mob-hide ${netClass}">${s.sb_net ? sign(s.sb_net)+fmtM(s.sb_net) : '<span class="na-txt">—</span>'}</td>
+      <td class="num-r mob-hide ${netClass}">${s.sb_buy > 0 || s.sb_sell > 0 ? sign(s.sb_net)+fmtM(s.sb_net) : '<span class="na-txt">—</span>'}</td>
       <td class="num-r mob-hide">${s.sb_buy ? fmtM(s.sb_buy) : '<span class="na-txt">—</span>'}</td>
       <td class="num-r mob-hide">${s.sb_sell ? fmtM(s.sb_sell) : '<span class="na-txt">—</span>'}</td>
       <td class="num-r mob-hide ${s.ccass_consec>0?'up-txt':s.ccass_consec<0?'dn-txt':''}">${fmtConsec(s)}</td>
@@ -1148,28 +1175,30 @@ function renderShort() {
 }
 
 function renderCcass() {
-  const sorted = [...allStocks].sort((a,b) => b.ccass_delta - a.ccass_delta);
+  // Sort by pct_delta (comparable across all stocks) not ccass_delta (raw shares)
+  const sorted = [...allStocks].sort((a,b) => (b.pct_delta||0) - (a.pct_delta||0));
   const topInc = sorted[0];
   const topDec = sorted[sorted.length-1];
   const consecCnt = sorted.filter(s => s.ccass_consec >= 5).length;
-  const topAvg = [...sorted].sort((a,b) => (b.pct_delta||0) - (a.pct_delta||0))[0];
+  const topConsec = [...sorted].sort((a,b) => (b.ccass_consec||0) - (a.ccass_consec||0))[0];
 
   document.getElementById('cc-top-name').textContent = topInc ? topInc.name_chi : '--';
   document.getElementById('cc-top-delta').textContent = topInc && topInc.pct_delta ? (topInc.pct_delta > 0 ? '+' : '') + topInc.pct_delta.toFixed(2) + '%' : '--';
   document.getElementById('cc-bot-name').textContent = topDec ? topDec.name_chi : '--';
   document.getElementById('cc-bot-delta').textContent = topDec && topDec.pct_delta ? (topDec.pct_delta > 0 ? '+' : '') + topDec.pct_delta.toFixed(2) + '%' : '--';
   document.getElementById('cc-consec-cnt').textContent = consecCnt;
-  document.getElementById('cc-avg-name').textContent = topAvg ? topAvg.name_chi : '--';
-  document.getElementById('cc-avg-val').textContent = topAvg && topAvg.pct_delta != null ? (topAvg.pct_delta > 0 ? '+' : '') + topAvg.pct_delta.toFixed(2) + '%' : '--';
+  document.getElementById('cc-avg-name').textContent = topConsec ? topConsec.name_chi : '--';
+  document.getElementById('cc-avg-val').textContent = topConsec ? (topConsec.ccass_consec > 0 ? '+' : '') + topConsec.ccass_consec + '日' : '--';
 
   const html = sorted.map((s,i) => {
-    const dClass = s.ccass_delta > 0 ? 'up-txt' : s.ccass_delta < 0 ? 'dn-txt' : '';
+    const dClass = s.pct_delta > 0 ? 'up-txt' : s.pct_delta < 0 ? 'dn-txt' : '';
     const cClass = s.ccass_consec > 0 ? 'up-txt' : s.ccass_consec < 0 ? 'dn-txt' : '';
+    const rawDelta = s.ccass_delta > 0 ? '+'+s.ccass_delta.toLocaleString('zh-HK') : s.ccass_delta ? s.ccass_delta.toLocaleString('zh-HK') : '—';
     return `<tr>
       <td class="rank">${i+1}</td>
       <td><span class="name-cell">${s.name_chi}</span><span class="name-zh">${s.code} · ${s.industry_zh||'—'}</span></td>
       <td class="num-r ${dClass}">${s.pct_delta != null && s.pct_delta !== 0 ? (s.pct_delta > 0 ? '+' : '') + s.pct_delta.toFixed(2) + '%' : '—'}</td>
-      <td class="num-r mob-hide">${s.pct_delta != null ? (s.pct_delta > 0 ? '+' : '') + s.pct_delta.toFixed(2) + '%' : '—'}</td>
+      <td class="num-r mob-hide ${dClass}">${rawDelta}</td>
       <td class="num-r mob-hide ${cClass}">${fmtConsec(s)}</td>
       <td class="num-r mob-hide">${fmtM(s.turnover)}</td>
       <td>${s.industry_zh || '—'}</td>
