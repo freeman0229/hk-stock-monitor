@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>港股 Top 100 策略報告</title>
+<title>港股 Top 30 策略報告</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Noto+Sans+HK:wght@300;400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
@@ -266,8 +266,8 @@
     <div class="logo-block">
       <div class="logo-pip"></div>
       <div class="logo-text">
-        <h1>港股 Top 100 策略報告</h1>
-        <p>HKEX DAILY QUOTATION · SHORT SELLING · CCASS SOUTHBOUND · SOUTHBOUND TOP 10</p>
+        <h1>港股 Top 30 策略報告</h1>
+        <p>HKEX DAILY QUOTATION · SHORT SELLING · CCASS SOUTHBOUND · TOP 30</p>
       </div>
     </div>
     <div id="time-display">正在載入…</div>
@@ -292,7 +292,7 @@
     <!-- LEFT: Chart -->
     <div class="panel">
       <div class="panel-head">
-        <h2><span class="dot"></span>南向十大 — 按港股成交額排列</h2>
+        <h2><span class="dot"></span>南向淨成交 — 按港股成交額排列</h2>
       </div>
       <div class="legend-row" id="legend-row"></div>
       <div class="chart-scroll-outer">
@@ -363,12 +363,9 @@ function renderAll(data) {
   setTime(data.update_time);
   renderKPIs(data.stocks);
   renderAlerts(data.stocks);
-  renderIndustryBar(data.stocks);  // industry bar still shows all 100
-  // Chart + table: only stocks with southbound data, ordered by daily turnover rank
-  const sbStocks = data.stocks.filter(x => x.sb_net !== 0);
-  const display  = sbStocks.length ? sbStocks : data.stocks;
-  renderChart(display);
-  renderTable(display);
+  renderIndustryBar(data.stocks);
+  renderChart(data.stocks);
+  renderTable(data.stocks);
 }
 
 // ── INDUSTRY FILTER BAR ────────────────────────────────────────────────────
@@ -433,16 +430,16 @@ function renderKPIs(s) {
   const alerts     = s.filter(x => x.insight).length;
   const avgShort   = (s.reduce((a,x)=>a+x.short_ratio,0)/s.length).toFixed(1);
   const avgShort5  = (s.reduce((a,x)=>a+x.short_avg5,0)/s.length).toFixed(1);
-  const netCcass   = s.reduce((a,x)=>a+x.ccass_delta,0);
+  const netCcass   = s.length ? (s.reduce((a,x)=>a+(x.pct_delta||0),0)/s.length).toFixed(3) : 0;
   const topSh      = s.slice().sort((a,b)=>b.short_ratio-a.short_ratio)[0];
   const fmt = n => n >= 1e9 ? (n/1e9).toFixed(1)+'B' : n >= 1e6 ? (n/1e6).toFixed(0)+'M' : n.toLocaleString();
-  const fmtDelta = n => (n > 0 ? '+' : '') + (n >= 1e6 ? (n/1e6).toFixed(1)+'M' : n >= 1e3 ? (n/1e3).toFixed(0)+'K' : n);
+  const fmtDelta = n => (n > 0 ? '+' : '') + Number(n).toFixed(3) + 'pp';
 
   document.getElementById('kpi-row').innerHTML = `
     <div class="kpi">
       <div class="label">異動股數</div>
       <div class="value" style="color:var(--amber)">${alerts}</div>
-      <div class="sub">南向 ${s.filter(x=>x.sb_net!==0).length} / 共 ${s.length} 隻</div>
+      <div class="sub">共 ${s.length} 隻監控</div>
     </div>
     <div class="kpi">
       <div class="label">今日均沽空率</div>
@@ -455,11 +452,11 @@ function renderKPIs(s) {
       <div class="sub">${topSh ? zhName(topSh.code, topSh.name_chi || topSh.name) : '--'}</div>
     </div>
     <div class="kpi">
-      <div class="label">CCASS 淨增持</div>
+      <div class="label">CCASS 今日均變動</div>
       <div class="value" style="color:${netCcass >= 0 ? 'var(--green)' : 'var(--red)'}">
         ${fmtDelta(netCcass)}
       </div>
-      <div class="sub">Top 100 合計今日增減</div>
+      <div class="sub">Top 30 合計今日增減</div>
     </div>
     <div class="kpi">
       <div class="label">榜首成交額</div>
@@ -487,7 +484,7 @@ function renderAlerts(s) {
     return `
       <div class="alert-chip ${chip}">
         ${x.insight} <strong>${zhName(x.code, x.name_chi || x.name)}</strong>
-        &nbsp;[${typeLabel}]&nbsp;·&nbsp;沽空率 ${x.short_ratio}%&nbsp;·&nbsp;CCASS Δ ${fmtSh(x.ccass_delta)}${consecStr}${tradeDateStr}
+        &nbsp;[${typeLabel}]&nbsp;·&nbsp;沽空率 ${x.short_ratio}%&nbsp;·&nbsp;CCASS ${(x.pct_delta>=0?'+':'')}${(x.pct_delta||0).toFixed(3)}pp${consecStr}${tradeDateStr}
       </div>
     `;
   }).join('');
@@ -556,8 +553,8 @@ function renderChart(s) {
   const sbSell   = s.map(x => +(( x.sb_sell || 0) / 1e8).toFixed(2));
   const shortR   = s.map(x => x.short_ratio);
   const shortA   = s.map(x => x.short_avg5);
-  const ccassD   = s.map(x => +(x.ccass_delta / 1e6).toFixed(2));
-  const ccassA   = s.map(x => +(x.ccass_avg5  / 1e6).toFixed(2));
+  const ccassD   = s.map(x => +((x.pct_delta  || 0)).toFixed(3));
+  const ccassA   = s.map(x => +((x.pct_dev30  || 0)).toFixed(3));
 
   // Bar colour: green=net buy, red=net sell, dim=not in southbound top10
   const SB_BUY_FILL   = '#1D9E7555';
@@ -582,12 +579,13 @@ function renderChart(s) {
   const lineLeg = [
     { style: `background:${SHORT_LINE};height:2px;border-radius:1px;width:18px`,       label: '沽空率 今日' },
     { style: `border-top:2px dashed ${SHORT_DASH};height:0;width:18px;margin:5px 0`,  label: '沽空率 5日均' },
-    { style: `background:${CCASS_LINE};height:2px;border-radius:1px;width:18px`,       label: 'CCASS Δ 今日' },
-    { style: `border-top:2px dashed ${CCASS_DASH};height:0;width:18px;margin:5px 0`,  label: 'CCASS Δ 5日均' },
+    { style: `background:${CCASS_LINE};height:2px;border-radius:1px;width:18px`,       label: 'CCASS 今日 Δ (pp)' },
+    { style: `border-top:2px dashed ${CCASS_DASH};height:0;width:18px;margin:5px 0`,  label: 'CCASS vs 30日均 (pp)' },
   ];
   const barLeg = [
     { fill: '#1D9E7555', border: '#1D9E75', label: '南向淨買入' },
     { fill: '#E24B4A55', border: '#E24B4A', label: '南向淨賣出' },
+    { fill: '#1e253530', border: '#1e2535', label: '不在十大' },
   ];
 
   legRow.innerHTML = `
@@ -638,14 +636,14 @@ function renderChart(s) {
           tension: 0, xAxisID: 'xShort', order: 2,
         },
         {
-          type: 'line', label: 'CCASS Δ 今日 (M股)',
+          type: 'line', label: 'CCASS 今日 Δ (pp)',
           data: ccassD,
           borderColor: CCASS_LINE, backgroundColor: 'transparent',
           borderWidth: 2, pointRadius: 3, pointBackgroundColor: CCASS_LINE,
           tension: 0, xAxisID: 'xCcass', order: 1,
         },
         {
-          type: 'line', label: 'CCASS Δ 5日均 (M股)',
+          type: 'line', label: 'CCASS vs 30日均 (pp)',
           data: ccassA,
           borderColor: CCASS_DASH, backgroundColor: 'transparent',
           borderWidth: 1.5, borderDash: [5, 4], pointRadius: 2, pointBackgroundColor: CCASS_DASH,
@@ -772,8 +770,8 @@ function rankTag(x) {
 function renderTable(s) {
   const mob = window.innerWidth < 600;
   const rows = s.map(x => {
-    const dc  = deltaClass(x.ccass_delta);
-    const ac  = deltaClass(x.ccass_avg5);
+    const dc  = deltaClass(x.pct_delta);
+    const ac  = deltaClass(x.pct_dev30);
     const sc  = shortClass(x);
     const tv  = x.turnover >= 1e9
       ? (x.turnover/1e9).toFixed(2)+'B'
@@ -801,8 +799,8 @@ function renderTable(s) {
         <td class="mono col-hide-mobile" style="color:${x.sb_net>0?'var(--green)':x.sb_net<0?'var(--red)':'var(--dim)'}">
           ${x.sb_net ? (x.sb_net>0?'+':'')+(x.sb_net/1e6).toFixed(0)+'M' : '<span style="color:var(--dim)">—</span>'}
         </td>
-        <td class="mono ${dc}">${fmtSh(x.ccass_delta)}</td>
-        <td class="mono col-hide-mobile ${ac}">${fmtSh(x.ccass_avg5)}</td>
+        <td class="mono ${dc}">${(x.pct_delta>=0?'+':'')+(x.pct_delta||0).toFixed(3)}pp</td>
+        <td class="mono col-hide-mobile ${ac}">${(x.pct_dev30>=0?'+':'')+(x.pct_dev30||0).toFixed(3)}pp</td>
         <td class="mono col-hide-mobile">${consecStr}</td>
         <td>${x.insight ? `<span class="badge ${badge}">${x.insight}</span>` : '<span style="color:var(--dim)">—</span>'}</td>
       </tr>

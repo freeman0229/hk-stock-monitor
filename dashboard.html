@@ -489,7 +489,7 @@ tbody td { padding: 9px 12px; vertical-align: middle; }
           <th class="rank">#</th>
           <th>股票</th>
           <th class="num-r" data-col="ccass_delta">今日持倉變動%</th>
-          <th class="num-r" data-col="pct_avg5">5日均變動%</th>
+          <th class="num-r" data-col="pct_delta">今日變動%</th>
           <th class="num-r" data-col="ccass_consec">連續日數</th>
           <th class="num-r" data-col="turnover">成交額(萬)</th>
           <th>行業</th>
@@ -677,7 +677,7 @@ function generateMockData() {
       sb_buy: Math.abs(sbn)*1.2, sb_sell: Math.abs(sbn)*0.8, sb_net: sbn,
       ccass_delta: cd, ccass_consec: cc,
       ccass_streak_pct: parseFloat((cc * (Math.random()*0.08 + 0.03) * (cc >= 0 ? 1 : -1)).toFixed(4)),
-      pct_avg5: parseFloat(((Math.random() - 0.5) * 0.3).toFixed(4)),
+
       pct_listed: 5 + Math.random() * 20,
       pct_delta: parseFloat(((Math.random() - 0.5) * 0.5).toFixed(4)),
       sb_consec: Math.floor(Math.random()*6),
@@ -907,7 +907,7 @@ function renderCcass() {
   const topInc = sorted[0];
   const topDec = sorted[sorted.length-1];
   const consecCnt = sorted.filter(s => s.ccass_consec >= 5).length;
-  const topAvg = [...sorted].sort((a,b) => (b.pct_avg5||0) - (a.pct_avg5||0))[0];
+  const topAvg = [...sorted].sort((a,b) => (b.pct_delta||0) - (a.pct_delta||0))[0];
 
   document.getElementById('cc-top-name').textContent = topInc ? topInc.name_chi : '--';
   document.getElementById('cc-top-delta').textContent = topInc && topInc.pct_delta ? (topInc.pct_delta > 0 ? '+' : '') + topInc.pct_delta.toFixed(2) + '%' : '--';
@@ -915,7 +915,7 @@ function renderCcass() {
   document.getElementById('cc-bot-delta').textContent = topDec && topDec.pct_delta ? (topDec.pct_delta > 0 ? '+' : '') + topDec.pct_delta.toFixed(2) + '%' : '--';
   document.getElementById('cc-consec-cnt').textContent = consecCnt;
   document.getElementById('cc-avg-name').textContent = topAvg ? topAvg.name_chi : '--';
-  document.getElementById('cc-avg-val').textContent = topAvg && topAvg.pct_avg5 != null ? (topAvg.pct_avg5 > 0 ? '+' : '') + topAvg.pct_avg5.toFixed(2) + '%均' : '--';
+  document.getElementById('cc-avg-val').textContent = topAvg && topAvg.pct_delta != null ? (topAvg.pct_delta > 0 ? '+' : '') + topAvg.pct_delta.toFixed(2) + '%' : '--';
 
   const html = sorted.slice(0,50).map((s,i) => {
     const dClass = s.ccass_delta > 0 ? 'up-txt' : s.ccass_delta < 0 ? 'dn-txt' : '';
@@ -924,7 +924,7 @@ function renderCcass() {
       <td class="rank">${i+1}</td>
       <td><span class="name-cell">${s.name_chi}</span><span class="name-zh">${s.code} · ${s.industry_zh||'—'}</span></td>
       <td class="num-r ${dClass}">${s.pct_delta != null && s.pct_delta !== 0 ? (s.pct_delta > 0 ? '+' : '') + s.pct_delta.toFixed(2) + '%' : '—'}</td>
-      <td class="num-r">${s.pct_avg5 != null ? (s.pct_avg5 > 0 ? '+' : '') + s.pct_avg5.toFixed(2) + '%' : '—'}</td>
+      <td class="num-r">${s.pct_delta != null ? (s.pct_delta > 0 ? '+' : '') + s.pct_delta.toFixed(2) + '%' : '—'}</td>
       <td class="num-r ${cClass}">${fmtConsec(s)}</td>
       <td class="num-r">${fmtM(s.turnover)}</td>
       <td>${s.industry_zh || '—'}</td>
