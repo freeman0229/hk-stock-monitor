@@ -456,7 +456,7 @@ tbody td { padding: 9px 12px; vertical-align: middle; }
 <div id="tabbar">
   <button class="tab-btn active" data-tab="bshui">北水追蹤</button>
   <button class="tab-btn" data-tab="short">累積沽空</button>
-  <button class="tab-btn" data-tab="ccass">CCASS持倉</button>
+  <button class="tab-btn" data-tab="ccass">大戶持倉</button>
   <button class="tab-btn" data-tab="cai">蔡氏通道</button>
 </div>
 
@@ -512,6 +512,29 @@ tbody td { padding: 9px 12px; vertical-align: middle; }
       </tbody>
     </table>
   </div>
+
+  <div class="sec-head" style="margin-top:16px">
+    <div class="sec-title">北水持股比例（CCASS）</div>
+    <button id="toggle-ccass-top" onclick="toggleCcassTop()" style="
+      border:1px solid var(--border);background:var(--card);color:var(--muted);
+      border-radius:4px;padding:4px 12px;font-size:12px;cursor:pointer;
+      font-family:'Noto Sans TC',sans-serif;transition:all .2s;
+    ">展開明細 ▼</button>
+  </div>
+  <div id="ccass-top-wrap" class="tbl-wrap" style="display:none">
+    <table id="tbl-ccass-top">
+      <thead>
+        <tr>
+          <th class="rank">#</th>
+          <th>股票</th>
+          <th class="num-r" data-col="pct_listed">持股比例%</th>
+        </tr>
+      </thead>
+      <tbody id="body-ccass-top">
+        <tr><td colspan="3"><div class="loading-box"><div class="spinner"></div>載入中…</div></td></tr>
+      </tbody>
+    </table>
+  </div>
 </div>
 
 <!-- ═══ Panel 2: 累積沽空 ════════════════════════════════════════════════════ -->
@@ -548,36 +571,13 @@ tbody td { padding: 9px 12px; vertical-align: middle; }
   </div>
 </div>
 
-<!-- ═══ Panel 3: CCASS持倉 ════════════════════════════════════════════════════ -->
+<!-- ═══ Panel 3: 大戶持倉 ════════════════════════════════════════════════════ -->
 <div class="panel" id="panel-ccass">
   <div class="summary-bar">
     <div class="sum-card"><div class="sum-label">CCASS增持最多</div><div class="sum-val up" id="cc-top-name">--</div><div class="sum-sub" id="cc-top-delta">--</div></div>
     <div class="sum-card"><div class="sum-label">CCASS減持最多</div><div class="sum-val dn" id="cc-bot-name">--</div><div class="sum-sub" id="cc-bot-delta">--</div></div>
     <div class="sum-card"><div class="sum-label">連續增持 ≥5日</div><div class="sum-val gold" id="cc-consec-cnt">--</div><div class="sum-sub">股票數</div></div>
     <div class="sum-card"><div class="sum-label">連續持倉最長</div><div class="sum-val" id="cc-avg-name">--</div><div class="sum-sub" id="cc-avg-val">--</div></div>
-  </div>
-
-  <div class="sec-head">
-    <div class="sec-title">北水持股比例（CCASS）</div>
-    <button id="toggle-ccass-top" onclick="toggleCcassTop()" style="
-      border:1px solid var(--border);background:var(--card);color:var(--muted);
-      border-radius:4px;padding:4px 12px;font-size:12px;cursor:pointer;
-      font-family:'Noto Sans TC',sans-serif;transition:all .2s;
-    ">展開明細 ▼</button>
-  </div>
-  <div id="ccass-top-wrap" class="tbl-wrap" style="display:none;margin-bottom:16px">
-    <table id="tbl-ccass-top">
-      <thead>
-        <tr>
-          <th class="rank">#</th>
-          <th>股票</th>
-          <th class="num-r" data-col="pct_listed">持股比例%</th>
-        </tr>
-      </thead>
-      <tbody id="body-ccass-top">
-        <tr><td colspan="3"><div class="loading-box"><div class="spinner"></div>載入中…</div></td></tr>
-      </tbody>
-    </table>
   </div>
 
   <div class="sec-head">
@@ -731,8 +731,8 @@ function miniBar(val, max, cls) {
 }
 
 // ── Load data.json ────────────────────────────────────────────────────────
-const CACHE_KEY = 'hk_dashboard_data_v3';   // v3: SB-only filter restored
-const CHART_CACHE_KEY = 'hk_chart_data_v3';  // v3: all stocks, no SB filter
+const CACHE_KEY = 'hk_dashboard_data_v4';   // v3: SB-only filter restored
+const CHART_CACHE_KEY = 'hk_chart_data_v4';  // v3: all stocks, no SB filter
 
 // Restore last chart data immediately so chart renders on first paint
 try {
