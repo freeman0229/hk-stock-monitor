@@ -246,11 +246,19 @@ def _cache_path(d: date) -> str:
     return os.path.join(CACHE_DIR, f"sc_{d.strftime('%Y%m%d')}.json")
 
 def fetch_day(d: date) -> dict | None:
-    """Fetch and parse southbound top 10 data for one trading day."""
+    """Fetch and parse southbound top 10 data for one trading day.
+    Cache stores raw JS text so parse_js always runs fresh.
+    If the cached file is stale (old JSON format), it is replaced."""
     cp = _cache_path(d)
     if os.path.exists(cp):
         with open(cp, encoding="utf-8") as f:
-            return json.load(f)
+            raw = f.read()
+        parsed = parse_js(raw)
+        if parsed is not None:
+            return parsed
+        # Cache file is stale (old JSON format) — delete and re-fetch
+        log.info("  stale cache for %s — re-fetching", d.isoformat())
+        os.remove(cp)
 
     url = BASE_URL.format(date=d.strftime("%Y%m%d"))
     try:
@@ -259,11 +267,9 @@ def fetch_day(d: date) -> dict | None:
             log.warning("  404: %s", url)
             return None
         r.raise_for_status()
-        parsed = parse_js(r.text)
-        if parsed:
-            with open(cp, "w", encoding="utf-8") as f:
-                json.dump(parsed, f, ensure_ascii=False, separators=(",", ":"))
-        return parsed
+        with open(cp, "w", encoding="utf-8") as f:
+            f.write(r.text)
+        return parse_js(r.text)
     except Exception as e:
         log.error("  fetch failed (%s): %s", d.isoformat(), e)
         return None
@@ -425,11 +431,18 @@ def export_csv():
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="HKEX Southbound Top 10 Library")
-    ap.add_argument("--update", action="store_true",  help="Fetch only new dates")
-    ap.add_argument("--query",  metavar="YYYY-MM-DD", help="Show data for a date")
-    ap.add_argument("--export", action="store_true",  help="Export all data to CSV")
+    ap.add_argument("--update",      action="store_true",  help="Fetch only new dates")
+    ap.add_argument("--query",       metavar="YYYY-MM-DD", help="Show data for a date")
+    ap.add_argument("--export",      action="store_true",  help="Export all data to CSV")
+    ap.add_argument("--clear-cache", action="store_true",  help="Delete sc_cache/ so JS is re-fetched and re-parsed")
     args = ap.parse_args()
 
-    if   args.query:  query_date(args.query)
+    if args.clear_cache:
+        import shutil
+        if os.path.exists(CACHE_DIR):
+            shutil.rmtree(CACHE_DIR)
+            os.makedirs(CACHE_DIR)
+            log.info("sc_cache cleared — re-run without --clear-cache to rebuild")
+    elif args.query:  query_date(args.query)
     elif args.export: export_csv()
     else:             build(update_only=args.update)

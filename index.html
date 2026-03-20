@@ -986,9 +986,11 @@ function drawSbChart(sorted) {
 }
 
 function renderBshui() {
-  // All stocks with any southbound flow (buy or sell), sorted by net flow descending
-  const sorted = [...allStocks].filter(s => s.sb_buy > 0 || s.sb_sell > 0).sort((a,b) => b.sb_net - a.sb_net);
-  console.log(`[bshui] allStocks=${allStocks.length} sb_active=${sorted.length} sample_sb_net=${allStocks[0]?.sb_net}`);
+  // All southbound stocks ordered by rank (best rank across SSE/SZSE) — no filters
+  const sorted = [...allStocks]
+    .filter(s => s.sb_buy > 0 || s.sb_sell > 0 || s.sb_total > 0)
+    .sort((a, b) => (a.sb_rank || 999) - (b.sb_rank || 999) || b.sb_total - a.sb_total);
+  console.log(`[bshui] allStocks=${allStocks.length} sb_active=${sorted.length}`);
   const display = sorted;
 
   // No sb data yet — show message, keep last cached chart
