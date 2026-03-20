@@ -21,7 +21,6 @@ log = logging.getLogger(__name__)
 # ── Config ────────────────────────────────────────────────────────────────────
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "").strip()
 CHAT_ID        = os.getenv("CHAT_ID", "").strip()
-TOP_OUTPUT     = 100
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (compatible; DataBot/1.0)",
@@ -245,7 +244,7 @@ def get_daily_quotation(date: datetime = None) -> pd.DataFrame:
 
         _update_name_map(name_map)
         df = pd.DataFrame(records)
-        df = df[df["turnover"] > 0].sort_values("turnover", ascending=False).head(TOP_OUTPUT).reset_index(drop=True)
+        df = df[df["turnover"] > 0].sort_values("turnover", ascending=False).reset_index(drop=True)
         log.info("Daily quotation: %d records for %s (top: %s %s)",
                  len(df), date_str, df.iloc[0]["stock_code"], df.iloc[0]["name"])
         return df
