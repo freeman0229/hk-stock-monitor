@@ -624,11 +624,13 @@ def run_analysis():
     sb_map = {}   # code -> {buy, sell, net, rank, total} in HKD
     for s in get_top10(today_ds):
         sb_map[s["code"]] = {
-            "sb_buy":   s["buy"],
-            "sb_sell":  s["sell"],
-            "sb_net":   s["buy"] - s["sell"],
-            "sb_rank":  s.get("rank", 0),
-            "sb_total": s.get("total", 0),
+            "sb_buy":    s["buy"],
+            "sb_sell":   s["sell"],
+            "sb_net":    s["buy"] - s["sell"],
+            "sb_rank":   s.get("rank", 0),
+            "sb_total":  s.get("total", 0),
+            "sb_rank_sse":  s.get("rank_sse"),
+            "sb_rank_szse": s.get("rank_szse"),
         }
     log.info("Southbound top10: %d stocks for %s", len(sb_map), today_ds)
 
@@ -639,11 +641,13 @@ def run_analysis():
         prev_ds = prev_td.strftime("%Y-%m-%d")
         for s in get_top10(prev_ds):
             sb_map[s["code"]] = {
-                "sb_buy":   s["buy"],
-                "sb_sell":  s["sell"],
-                "sb_net":   s["buy"] - s["sell"],
-                "sb_rank":  s.get("rank", 0),
-                "sb_total": s.get("total", 0),
+                "sb_buy":    s["buy"],
+                "sb_sell":   s["sell"],
+                "sb_net":    s["buy"] - s["sell"],
+                "sb_rank":   s.get("rank", 0),
+                "sb_total":  s.get("total", 0),
+                "sb_rank_sse":  s.get("rank_sse"),
+                "sb_rank_szse": s.get("rank_szse"),
             }
         if sb_map:
             sb_date_used = prev_ds
@@ -656,19 +660,34 @@ def run_analysis():
     # (buy > sell). A day the stock is absent = fell off table = streak reset.
     # Also grab previous day's net for ranking-change comparison.
     def _sb_consec_and_prev(code: str) -> tuple[int, int]:
-        """Returns (consecutive_net_buy_days, prev_day_net_flow)."""
+        """Returns (consecutive_net_buy_days_including_today, prev_day_net_flow).
+
+        Streak logic:
+        - today always counts as day 1 if it's in sb_map (it is, by definition)
+        - walk back through history; extend streak on net-buy days
+        - skip net-zero days (buy == sell) — consistent with CCASS consec
+        - break on net-sell days
+        """
         history = get_top10_history(code, 30, today_ds)
         # history is reverse-chrono: [yesterday, day-before, ...]
-        if not history:
-            return 0, 0
-        prev_net = history[0]["buy"] - history[0]["sell"]
-        consec = 0
+        prev_net = (history[0]["buy"] - history[0]["sell"]) if history else 0
+
+        today_net = sb_map[code]["sb_net"]   # today is always in sb_map here
+        if today_net <= 0:
+            # today is net-sell or zero — streak is 0 (or negative for sell)
+            consec = -1 if today_net < 0 else 0
+            return consec, prev_net
+
+        # today is net-buy → start streak at 1, extend with prior net-buy days
+        consec = 1
         for entry in history:
             net = entry["buy"] - entry["sell"]
             if net > 0:
-                consec += 1
+                consec += 1       # same direction, extend
+            elif net == 0:
+                continue          # flat day — skip, don't break streak
             else:
-                break   # net sell or zero = streak ends
+                break             # net-sell — streak ends
         return consec, prev_net
 
     sb_consec_map  = {}
@@ -745,6 +764,8 @@ def run_analysis():
             "sb_net":      sb.get("sb_net",   0),
             "sb_rank":     sb.get("sb_rank",  0),
             "sb_total":    sb.get("sb_total", 0),
+            "sb_rank_sse":  sb.get("sb_rank_sse"),
+            "sb_rank_szse": sb.get("sb_rank_szse"),
             "sb_net_prev": int(sb_prev_map.get(code, 0)),
             "sb_consec":   int(sb_consec_map.get(code, 0)),
             "short_ratio": round(short_ratio, 2), "short_avg5": round(short_avg5, 2),
