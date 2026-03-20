@@ -799,11 +799,15 @@ function drawSbChart(sorted) {
   if (!canvas) return;
   const stocks = sorted.slice(0, 30);
   if (!stocks.length) return;
-  const ROW_H = 28, PAD_LEFT = 140, PAD_RIGHT = 90, PAD_TOP = 8, PAD_BOT = 20;
-  const W = canvas.parentElement.offsetWidth || canvas.parentElement.clientWidth || 700;
+  const ROW_H = 36, PAD_LEFT = 160, PAD_RIGHT = 100, PAD_TOP = 12, PAD_BOT = 24;
+
+  // Use the panel width, not just the canvas parent
+  const panel = document.getElementById('panel-bshui');
+  const W = (panel ? panel.offsetWidth : 0) - 32 || 700;
   const H = PAD_TOP + stocks.length * ROW_H + PAD_BOT;
   canvas.width = W; canvas.height = H;
   canvas.style.height = H + 'px';
+  canvas.style.width  = '100%';
   const ctx = canvas.getContext('2d');
   ctx.clearRect(0, 0, W, H);
 
@@ -846,7 +850,7 @@ function drawSbChart(sorted) {
 
     // row number = turnover rank from HKEX daily quotation
     ctx.fillStyle = '#aaa';
-    ctx.font = '10px monospace';
+    ctx.font = '12px monospace';
     ctx.fillText(String(s.rank || i+1).padStart(2,'0'), 4, cy);
 
     // sb_net rank change badge: NEW / ▲n / ▼n / —
@@ -855,22 +859,22 @@ function drawSbChart(sorted) {
     else if (rc > 0)          { rcColor = '#c0252d'; rcText = `▲${rc}`; }
     else if (rc < 0)          { rcColor = '#1a7a3c'; rcText = `▼${Math.abs(rc)}`; }
     ctx.fillStyle = rcColor;
-    ctx.font = `bold 10px "Noto Sans TC", sans-serif`;
-    ctx.fillText(rcText, 22, cy);
+    ctx.font = `bold 12px "Noto Sans TC", sans-serif`;
+    ctx.fillText(rcText, 28, cy);
 
     // streak badge (e.g. "3連買")
     const consecLabel = consec >= 2 ? ` ${consec}連買` : '';
 
     // stock code
     ctx.fillStyle = '#888';
-    ctx.font = '10px monospace';
-    ctx.fillText(s.code, 52, cy);
+    ctx.font = '11px monospace';
+    ctx.fillText(s.code, 64, cy);
 
     // stock name + indicators
     ctx.fillStyle = '#222';
-    ctx.font = `500 12px "Noto Sans TC", sans-serif`;
+    ctx.font = `500 13px "Noto Sans TC", sans-serif`;
     const nameLabel = (s.name_chi || s.name) + consecLabel;
-    ctx.fillText(nameLabel, 94, cy);
+    ctx.fillText(nameLabel, 110, cy);
 
     // bar
     const bw = Math.abs(s.sb_net) / maxAbs * (chartW / 2) * 0.92;
@@ -895,18 +899,18 @@ function drawSbChart(sorted) {
 
     // value label on the right
     ctx.textAlign = 'left';
-    ctx.font = '11px "Noto Sans TC", sans-serif';
+    ctx.font = '12px "Noto Sans TC", sans-serif';
     ctx.fillStyle = s.sb_net >= 0 ? '#c0252d' : '#1a7a3c';
     const valLabel = (s.sb_net >= 0 ? '+' : '') + fmtM(s.sb_net);
-    ctx.fillText(valLabel, W - PAD_RIGHT + 6, cy);
+    ctx.fillText(valLabel, W - PAD_RIGHT + 8, cy);
   });
 
   // x-axis labels
-  ctx.textAlign = 'center'; ctx.fillStyle = '#aaa'; ctx.font = '10px sans-serif'; ctx.textBaseline = 'alphabetic';
+  ctx.textAlign = 'center'; ctx.fillStyle = '#aaa'; ctx.font = '11px sans-serif'; ctx.textBaseline = 'alphabetic';
   const maxM = fmtM(maxAbs);
-  ctx.fillText('0', zeroX, H - 4);
-  ctx.fillText(maxM, zeroX + chartW/2 * 0.92, H - 4);
-  ctx.fillText('-'+maxM, zeroX - chartW/2 * 0.92, H - 4);
+  ctx.fillText('0', zeroX, H - 6);
+  ctx.fillText(maxM, zeroX + chartW/2 * 0.92, H - 6);
+  ctx.fillText('-'+maxM, zeroX - chartW/2 * 0.92, H - 6);
 }
 
 function renderBshui() {
