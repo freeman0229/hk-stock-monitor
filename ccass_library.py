@@ -11,7 +11,7 @@ Structure:
   "meta": {"year": 2026, "last_updated": "...", "total_days": N, "total_records": N},
   "by_date": {
     "2026-03-14": {
-      "00700": {"sh": 4521000000, "pct": 8.43},
+      "00700": {"sh": 4521000000, "pct": 8.43, "name": "騰訊控股"},
       ...
     }
   }
@@ -120,7 +120,7 @@ def all_stored_dates() -> set:
 def save_day(d, records: dict):
     """
     Save one day's CCASS data into the library.
-    records: {code: {"sh": int, "pct": float}}
+    records: {code: {"sh": int, "pct": float, "name": str}}
     Accepts a datetime or date object, or a YYYY-MM-DD string.
     """
     if not records:
@@ -181,6 +181,7 @@ def fetch_ccass(d: date) -> dict | None:
                 return re.sub(r'^[^:：]+[:：]\s*', '', s).strip()
 
             code_raw = clean(tds[0]).replace(",", "")
+            name_raw = clean(tds[1]).strip()
             sh_raw   = clean(tds[2]).replace(",", "")
             pct_raw  = clean(tds[3]).replace("%", "").strip()
 
@@ -189,8 +190,9 @@ def fetch_ccass(d: date) -> dict | None:
 
             code = str(int(code_raw)).zfill(5)
             records[code] = {
-                "sh":  int(sh_raw),
-                "pct": float(pct_raw) if pct_raw else 0.0,
+                "sh":   int(sh_raw),
+                "pct":  float(pct_raw) if pct_raw else 0.0,
+                "name": name_raw,
             }
 
         if not records:
@@ -343,6 +345,23 @@ def export_stock_csv(code: str):
     path = f"{code.zfill(5)}_ccass_history.csv"
     pd.DataFrame(rows).to_csv(path, index=False)
     print(f"Exported {len(rows)} rows to {path}")
+
+
+def get_ccass_name(code: str) -> str | None:
+    """Return the most recent Chinese name for a stock from CCASS records."""
+    code5 = code.zfill(5)
+    for year in sorted(all_years(), reverse=True):
+        p = lib_path(year)
+        if not os.path.exists(p): continue
+        with open(p, encoding="utf-8") as f:
+            by_date = json.load(f).get("by_date", {})
+        for ds in sorted(by_date.keys(), reverse=True):
+            entry = by_date[ds].get(code5)
+            if entry and isinstance(entry, dict):
+                name = entry.get("name")
+                if name:
+                    return name
+    return None
 
 
 # ── CLI ───────────────────────────────────────────────────────────────────────
