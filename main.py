@@ -576,11 +576,13 @@ def run_analysis():
     # 2. Short selling
     df_short  = get_short_sell_today()
     save_short_sell(trading_day, df_short)
-    short_map = {}
+    short_map     = {}
+    short_vol_map = {}
     for row in df_short.itertuples():
         tv = turnover_map.get(row.stock_code, 0)
         if tv > 0:
             short_map[row.stock_code] = round(row.short_turnover / tv * 100, 2)
+        short_vol_map[row.stock_code] = int(row.short_volume)
 
     # 3. Short avg
     _tv_recent    = tv_load_recent(15, today_ds)
@@ -689,8 +691,7 @@ def run_analysis():
         tv_avg5          = _turnover_avg(code, today_ds, 5)
 
         # ── 挾倉高危: short volume vs avg 30-day share volume ──────────────────
-        short_vol_today = df_short[df_short["stock_code"] == code]["short_volume"].sum() \
-                          if not df_short.empty else 0
+        short_vol_today = short_vol_map.get(code, 0)
         vol_hist30      = get_vol_history(code, 30, today_ds)
         avg_vol30       = sum(vol_hist30) / len(vol_hist30) if vol_hist30 else 0
         today_vol       = int(row.shares)
