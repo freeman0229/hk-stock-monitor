@@ -456,7 +456,7 @@ tbody td { padding: 9px 12px; vertical-align: middle; }
 <div id="tabbar">
   <button class="tab-btn active" data-tab="bshui">北水追蹤</button>
   <button class="tab-btn" data-tab="short">累積沽空</button>
-  <button class="tab-btn" data-tab="ccass">大戶持倉</button>
+  <button class="tab-btn" data-tab="ccass">CCASS持倉</button>
   <button class="tab-btn" data-tab="cai">蔡氏通道</button>
 </div>
 
@@ -548,7 +548,7 @@ tbody td { padding: 9px 12px; vertical-align: middle; }
   </div>
 </div>
 
-<!-- ═══ Panel 3: 大戶持倉 ════════════════════════════════════════════════════ -->
+<!-- ═══ Panel 3: CCASS持倉 ════════════════════════════════════════════════════ -->
 <div class="panel" id="panel-ccass">
   <div class="summary-bar">
     <div class="sum-card"><div class="sum-label">CCASS增持最多</div><div class="sum-val up" id="cc-top-name">--</div><div class="sum-sub" id="cc-top-delta">--</div></div>
@@ -558,7 +558,30 @@ tbody td { padding: 9px 12px; vertical-align: middle; }
   </div>
 
   <div class="sec-head">
-    <div class="sec-title">大戶持倉變動（CCASS）</div>
+    <div class="sec-title">北水持股比例（CCASS）</div>
+    <button id="toggle-ccass-top" onclick="toggleCcassTop()" style="
+      border:1px solid var(--border);background:var(--card);color:var(--muted);
+      border-radius:4px;padding:4px 12px;font-size:12px;cursor:pointer;
+      font-family:'Noto Sans TC',sans-serif;transition:all .2s;
+    ">展開明細 ▼</button>
+  </div>
+  <div id="ccass-top-wrap" class="tbl-wrap" style="display:none;margin-bottom:16px">
+    <table id="tbl-ccass-top">
+      <thead>
+        <tr>
+          <th class="rank">#</th>
+          <th>股票</th>
+          <th class="num-r" data-col="pct_listed">持股比例%</th>
+        </tr>
+      </thead>
+      <tbody id="body-ccass-top">
+        <tr><td colspan="3"><div class="loading-box"><div class="spinner"></div>載入中…</div></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="sec-head">
+    <div class="sec-title">持倉變動（CCASS）</div>
     <div class="sec-sub">按今日持倉變動排序 ｜ 數據來源：HKEX CCASS</div>
   </div>
   <div class="tbl-wrap">
@@ -851,6 +874,14 @@ function renderAll() {
 function toggleBshuiTable() {
   const wrap = document.getElementById('bshui-tbl-wrap');
   const btn  = document.getElementById('toggle-bshui-tbl');
+  const open = wrap.style.display === 'none';
+  wrap.style.display = open ? 'block' : 'none';
+  btn.textContent = open ? '收起明細 ▲' : '展開明細 ▼';
+}
+
+function toggleCcassTop() {
+  const wrap = document.getElementById('ccass-top-wrap');
+  const btn  = document.getElementById('toggle-ccass-top');
   const open = wrap.style.display === 'none';
   wrap.style.display = open ? 'block' : 'none';
   btn.textContent = open ? '收起明細 ▲' : '展開明細 ▼';
@@ -1169,7 +1200,33 @@ function renderShort() {
   document.getElementById('body-short').innerHTML = html;
 }
 
+function renderCcassTop() {
+  // Top 10 by pct_listed (% of listed shares held in CCASS southbound)
+  const top = [...allStocks]
+    .filter(s => s.pct_listed > 0)
+    .sort((a, b) => (b.pct_listed||0) - (a.pct_listed||0))
+    .slice(0, 10);
+  const html = top.map((s, i) => {
+    const bar = Math.min(100, Math.round(s.pct_listed));
+    const col = s.pct_listed >= 20 ? '#c0252d' : s.pct_listed >= 10 ? '#e07020' : 'var(--muted)';
+    return `<tr>
+      <td class="rank">${i+1}</td>
+      <td><span class="name-cell">${s.name_chi}</span><span class="name-zh">${s.code}</span></td>
+      <td class="num-r">
+        <div style="display:inline-flex;align-items:center;gap:6px">
+          <div style="width:60px;height:5px;background:var(--border);border-radius:3px;overflow:hidden">
+            <div style="width:${bar}%;height:100%;background:${col};border-radius:3px"></div>
+          </div>
+          <span style="color:${col};font-size:11px;font-weight:600;min-width:36px">${s.pct_listed.toFixed(2)}%</span>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+  document.getElementById('body-ccass-top').innerHTML = html || '<tr><td colspan="3" class="loading-box">—</td></tr>';
+}
+
 function renderCcass() {
+  renderCcassTop();
   // Sort by pct_delta (comparable across all stocks) not ccass_delta (raw shares)
   const sorted = [...allStocks].sort((a,b) => (b.pct_delta||0) - (a.pct_delta||0));
   const topInc = sorted[0];

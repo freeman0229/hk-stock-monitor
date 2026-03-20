@@ -513,9 +513,7 @@ def classify_insight(code, stock_type, short_ratio, short_avg5, short_ratio_t2,
                      tv_ratio30=0.0, pct_dev30=0.0,
                      sb_net=0) -> str:
     lo, hi, spike_warn, cover_drop = THRESHOLDS.get(stock_type, THRESHOLDS["general"])
-    r_today = turnover / tv_avg5  if tv_avg5  > 0 else 1.0
-    r_t2    = turnover_t2 / tv_avg5 if tv_avg5 > 0 else 1.0
-    sc_t2   = (short_ratio_t2 - short_avg5) / short_avg5 if short_avg5 > 0 else 0.0
+    r_today = turnover / tv_avg5 if tv_avg5 > 0 else 1.0   # used in 空頭平倉
 
     # ── 挾倉高危 — short squeeze danger ───────────────────────────────────────
     if days_to_cover > 5 and vol_ratio > 2:                      return "🔥 挾倉高危"
