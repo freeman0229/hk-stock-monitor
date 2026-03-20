@@ -159,9 +159,11 @@ def _parse_top10(table: dict, is_southbound: bool) -> list:
             if len(row) < 4: continue
             rank = _to_i(row[0])
             if rank <= 0: continue       # skip header/summary rows
+            code_raw = row[1].strip()
+            if not code_raw.isdigit(): continue   # skip invalid/placeholder rows
             stocks.append({
                 "rank":  rank,
-                "code":  row[1].strip().zfill(6),
+                "code":  code_raw.zfill(6),
                 "name":  _clean_name(row[2]),
                 "total": _to_i(row[3]),
             })
@@ -170,9 +172,11 @@ def _parse_top10(table: dict, is_southbound: bool) -> list:
             if len(row) < 6: continue
             rank = _to_i(row[0])
             if rank <= 0: continue       # skip header/summary rows
+            code_raw = row[1].strip()
+            if not code_raw.isdigit(): continue   # skip invalid/placeholder rows (e.g. "-0")
             stocks.append({
                 "rank":  rank,
-                "code":  row[1].strip().zfill(5),
+                "code":  code_raw.zfill(5),
                 "name":  _clean_name(row[2]),
                 "buy":   _to_i(row[3]),
                 "sell":  _to_i(row[4]),
@@ -265,6 +269,13 @@ def parse_js(text: str) -> dict | None:
     log.info("parse_js: SSE=%d SZSE=%d merged=%d (overlap=%d)",
              n_sse, n_szse, n_merged, n_sse + n_szse - n_merged)
 
+    # Set the compat `rank` field = best single-exchange rank (for main.py sb_rank).
+    # Must be done AFTER both exchange loops so both rank_sse and rank_szse are set.
+    for v in merged.values():
+        sse_r  = v["rank_sse"]  if v["rank_sse"]  is not None else 99
+        szse_r = v["rank_szse"] if v["rank_szse"] is not None else 99
+        v["rank"] = min(sse_r, szse_r)
+
     # Sort by combined total turnover descending.
     result["top10"] = sorted(merged.values(), key=lambda x: x["total"], reverse=True)
     return result
@@ -307,8 +318,17 @@ def fetch_day(d: date) -> dict | None:
 
 # ── Build / update ────────────────────────────────────────────────────────────
 
+def _is_valid_top10(rec: dict) -> bool:
+    """Return True if the top10 record looks complete and valid."""
+    top10 = rec.get("top10", [])
+    if len(top10) < 10:
+        return False
+    # Check for garbage codes like "-0000" (placeholder rows from holiday stubs)
+    valid_codes = [s for s in top10 if s.get("code", "").isdigit()]
+    return len(valid_codes) >= 10
+
 def _incomplete_dates() -> set:
-    """Return stored dates where top10 has fewer than 10 stocks — incomplete parse."""
+    """Return stored dates where top10 has fewer than 10 stocks or contains invalid codes."""
     incomplete = set()
     for year in all_years():
         p = lib_path(year)
@@ -316,15 +336,15 @@ def _incomplete_dates() -> set:
         with open(p, encoding="utf-8") as f:
             by_date = json.load(f).get("by_date", {})
         for ds, rec in by_date.items():
-            if len(rec.get("top10", [])) < 10:
+            if not _is_valid_top10(rec):
                 incomplete.add(ds)
     if incomplete:
-        log.info("Incomplete dates (< 10 stocks): %d — will re-fetch", len(incomplete))
+        log.info("Incomplete dates (< 10 valid stocks): %d — will re-fetch", len(incomplete))
     return incomplete
 
 def build(update_only: bool = False):
     stored  = all_stored_dates()
-    end     = last_trading_day(date.today() - timedelta(days=1))
+    end     = last_trading_day(date.today())   # include today — HKEX publishes same-day SC data
     trading = all_trading_days(last_trading_day(START_DATE), end)
 
     # Always include incomplete dates (stored but < 10 stocks) for re-fetch
