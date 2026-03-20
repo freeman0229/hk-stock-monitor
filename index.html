@@ -465,7 +465,6 @@ tbody td { padding: 9px 12px; vertical-align: middle; }
   <div class="summary-bar" id="sb-summary">
     <div class="sum-card"><div class="sum-label">今日北水淨買入 Top</div><div class="sum-val up" id="sb-top-buy">--</div><div class="sum-sub" id="sb-top-buy-name">--</div></div>
     <div class="sum-card"><div class="sum-label">今日北水淨賣出 Top</div><div class="sum-val dn" id="sb-top-sell">--</div><div class="sum-sub" id="sb-top-sell-name">--</div></div>
-    <div class="sum-card"><div class="sum-label">北水最高佔比</div><div class="sum-val gold" id="sb-top-pct">--</div><div class="sum-sub" id="sb-top-pct-name">--</div></div>
     <div class="sum-card"><div class="sum-label">北水持續淨買入</div><div class="sum-val gold" id="sb-consec">--</div><div class="sum-sub" id="sb-consec-name">--</div></div>
   </div>
 
@@ -504,13 +503,12 @@ tbody td { padding: 9px 12px; vertical-align: middle; }
           <th class="num-r mob-hide" data-col="sb_net">北水淨流入</th>
           <th class="num-r mob-hide" data-col="sb_buy">北水買入</th>
           <th class="num-r mob-hide" data-col="sb_sell">北水賣出</th>
-          <th class="num-r mob-hide" data-col="sb_rank_sse">SSE/SZ</th>
           <th class="num-r mob-hide" data-col="ccass_consec">連續日數</th>
           <th data-col="insight">信號</th>
         </tr>
       </thead>
       <tbody id="body-bshui">
-        <tr><td colspan="10"><div class="loading-box"><div class="spinner"></div>載入中…</div></td></tr>
+        <tr><td colspan="9"><div class="loading-box"><div class="spinner"></div>載入中…</div></td></tr>
       </tbody>
     </table>
   </div>
@@ -711,7 +709,7 @@ function miniBar(val, max, cls) {
 
 // ── Load data.json ────────────────────────────────────────────────────────
 const CACHE_KEY = 'hk_dashboard_data_v2';   // bump version to bust old cache
-const CHART_CACHE_KEY = 'hk_chart_data_v2';
+const CHART_CACHE_KEY = 'hk_chart_data_v3';  // v3: all stocks, no SB filter
 
 // Restore last chart data immediately so chart renders on first paint
 try {
@@ -865,11 +863,6 @@ function getLayout() {
   return 'laptop';
 }
 
-function getTableRows() {
-  const l = getLayout();
-  return l === 'portrait' ? 10 : l === 'landscape' ? 15 : 30;
-}
-
 function drawSbChart(sorted) {
   const canvas = document.getElementById('sbChart');
   if (!canvas) return;
@@ -894,7 +887,7 @@ function drawSbChart(sorted) {
   ctx.clearRect(0, 0, W, H);
 
   const chartW = W - PAD_LEFT - PAD_RIGHT;
-  const maxAbs = Math.max(...stocks.map(s => Math.abs(s.sb_net)), 1);
+  const maxAbs = Math.max(...stocks.filter(s => s.sb_total > 0 || s.sb_buy > 0).map(s => Math.abs(s.sb_net)), 1);
   console.log(`[chart] W=${W} chartW=${chartW} stocks=${stocks.length} maxAbs=${maxAbs} layout=${layout}`);
 
   // zero line x
@@ -960,14 +953,21 @@ function drawSbChart(sorted) {
       ctx.fillText(nameLabel, 110, cy);
     }
 
-    // bar
-    const bw = Math.abs(s.sb_net) / maxAbs * (chartW / 2) * 0.92;
-    if (s.sb_net >= 0) {
-      ctx.fillStyle = '#c0252d';
-      ctx.fillRect(zeroX, cy - barH/2, bw, barH);
+    // bar — only draw if stock has SB flow; zero-SB stocks get a grey centre tick
+    const hasSb = s.sb_total > 0 || s.sb_buy > 0 || s.sb_sell > 0;
+    const bw = hasSb ? Math.abs(s.sb_net) / maxAbs * (chartW / 2) * 0.92 : 0;
+    if (hasSb) {
+      if (s.sb_net >= 0) {
+        ctx.fillStyle = '#c0252d';
+        ctx.fillRect(zeroX, cy - barH/2, Math.max(bw, 1), barH);
+      } else {
+        ctx.fillStyle = '#1a7a3c';
+        ctx.fillRect(zeroX - Math.max(bw, 1), cy - barH/2, Math.max(bw, 1), barH);
+      }
     } else {
-      ctx.fillStyle = '#1a7a3c';
-      ctx.fillRect(zeroX - bw, cy - barH/2, bw, barH);
+      // No SB data — draw a subtle centre tick
+      ctx.fillStyle = 'rgba(0,0,0,0.12)';
+      ctx.fillRect(zeroX - 1, cy - barH/2, 2, barH);
     }
 
     // CCASS dot
@@ -981,12 +981,16 @@ function drawSbChart(sorted) {
       ctx.globalAlpha = 1;
     }
 
-    // value label on the right
+    // value label on the right — dash for non-SB stocks
     ctx.textAlign = 'left';
     ctx.font = '12px "Noto Sans TC", sans-serif';
-    ctx.fillStyle = s.sb_net >= 0 ? '#c0252d' : '#1a7a3c';
-    const valLabel = (s.sb_net >= 0 ? '+' : '') + fmtM(s.sb_net);
-    ctx.fillText(valLabel, W - PAD_RIGHT + 8, cy);
+    if (hasSb) {
+      ctx.fillStyle = s.sb_net >= 0 ? '#c0252d' : '#1a7a3c';
+      ctx.fillText((s.sb_net >= 0 ? '+' : '') + fmtM(s.sb_net), W - PAD_RIGHT + 8, cy);
+    } else {
+      ctx.fillStyle = '#bbb';
+      ctx.fillText('—', W - PAD_RIGHT + 8, cy);
+    }
   });
 
   // x-axis labels
@@ -1001,10 +1005,11 @@ function renderBshui() {
   // Pipeline: read all stocks with any SB flow → join overall turnover → sort by
   // overall market turnover high→low. This shows the big picture: which of today's
   // most-traded stocks had mainland money in them, and how much of the tape was SB.
+  // Show ALL stocks sorted by overall turnover — SB participation overlaid.
+  // No filter: stocks with zero SB flow still appear with empty SB columns.
   const sorted = [...allStocks]
-    .filter(s => s.sb_buy > 0 || s.sb_sell > 0 || s.sb_total > 0)
     .sort((a, b) => (b.turnover || 0) - (a.turnover || 0));
-  console.log(`[bshui] allStocks=${allStocks.length} sb_active=${sorted.length}`);
+  console.log(`[bshui] allStocks=${allStocks.length} sb_active=${sorted.filter(s=>s.sb_total>0).length}`);
   const display = sorted;
 
   // No sb data yet — show message, keep last cached chart
@@ -1016,7 +1021,7 @@ function renderBshui() {
     document.getElementById('sb-consec').textContent = '';
     document.getElementById('sb-consec-name').textContent = '';
     document.getElementById('body-bshui').innerHTML =
-      '<tr><td colspan="10"><div class="loading-box" style="padding:30px">📡 北水數據尚未發布，通常於每交易日 20:00 HKT 後更新</div></td></tr>';
+      '<tr><td colspan="9"><div class="loading-box" style="padding:30px">📡 北水數據尚未發布，通常於每交易日 20:00 HKT 後更新</div></td></tr>';
     // Keep last cached chart visible if available
     if (lastChartData.length) setTimeout(() => drawSbChart(lastChartData), 50);
     return;
@@ -1034,22 +1039,14 @@ function renderBshui() {
 
   const topBuy    = [...display].sort((a,b) => b.sb_net - a.sb_net)[0];
   const topSell   = [...display].sort((a,b) => a.sb_net - b.sb_net)[0];
-  const topPct    = [...display].sort((a,b) => {
-    const pa = a.turnover > 0 ? a.sb_total / a.turnover : 0;
-    const pb = b.turnover > 0 ? b.sb_total / b.turnover : 0;
-    return pb - pa;
-  })[0];
+
   const topConsec = [...display].sort((a,b) => (b.sb_consec||0) - (a.sb_consec||0))[0];
 
   document.getElementById('sb-top-buy').textContent = topBuy ? fmtM(topBuy.sb_net) : '--';
   document.getElementById('sb-top-buy-name').textContent = topBuy ? topBuy.name_chi : '--';
   document.getElementById('sb-top-sell').textContent = topSell ? fmtM(topSell.sb_net) : '--';
   document.getElementById('sb-top-sell-name').textContent = topSell ? topSell.name_chi : '--';
-  if (document.getElementById('sb-top-pct')) {
-    const topPctVal = topPct && topPct.turnover > 0 ? (topPct.sb_total / topPct.turnover * 100) : 0;
-    document.getElementById('sb-top-pct').textContent = topPct ? topPctVal.toFixed(1) + '%' : '--';
-    document.getElementById('sb-top-pct-name').textContent = topPct ? topPct.name_chi : '--';
-  }
+
   const topConsecVal = topConsec ? (topConsec.sb_consec || 0) : 0;
   document.getElementById('sb-consec').textContent = topConsecVal >= 2 ? topConsecVal + '日' : '';
   document.getElementById('sb-consec-name').textContent = topConsecVal >= 2 ? topConsec.name_chi : '';
@@ -1097,24 +1094,19 @@ function renderBshui() {
   const html = display.map((s,i) => {
     const netClass = s.sb_net > 0 ? 'up-txt' : 'dn-txt';
     const sbPct    = s.turnover > 0 ? (s.sb_total / s.turnover * 100) : 0;
-    // SSE/SZ rank badges
-    const rSSE  = s.sb_rank_sse  != null ? `<span style="font-size:10px;color:var(--muted)">滬#${s.sb_rank_sse}</span>`  : '';
-    const rSZSE = s.sb_rank_szse != null ? `<span style="font-size:10px;color:var(--muted)">深#${s.sb_rank_szse}</span>` : '';
-    const rankBadges = [rSSE, rSZSE].filter(Boolean).join(' ') || '—';
     return `<tr>
       <td class="rank">${i+1}</td>
       <td><span class="name-cell">${s.name_chi}</span><span class="name-zh">${s.code}</span></td>
       <td class="num-r">${fmtM(s.turnover)}</td>
-      <td class="num-r">${sbParticipationBar(sbPct)}</td>
-      <td class="num-r mob-hide ${netClass}">${sign(s.sb_net)}${fmtM(s.sb_net)}</td>
-      <td class="num-r mob-hide">${fmtM(s.sb_buy)}</td>
-      <td class="num-r mob-hide">${fmtM(s.sb_sell)}</td>
-      <td class="num-r mob-hide" style="white-space:nowrap;line-height:1.6">${rankBadges}</td>
+      <td class="num-r">${sbPct > 0 ? sbParticipationBar(sbPct) : '<span class="na-txt">—</span>'}</td>
+      <td class="num-r mob-hide ${netClass}">${s.sb_net ? sign(s.sb_net)+fmtM(s.sb_net) : '<span class="na-txt">—</span>'}</td>
+      <td class="num-r mob-hide">${s.sb_buy ? fmtM(s.sb_buy) : '<span class="na-txt">—</span>'}</td>
+      <td class="num-r mob-hide">${s.sb_sell ? fmtM(s.sb_sell) : '<span class="na-txt">—</span>'}</td>
       <td class="num-r mob-hide ${s.ccass_consec>0?'up-txt':s.ccass_consec<0?'dn-txt':''}">${fmtConsec(s)}</td>
       <td>${insightBadge(s.insight)}</td>
     </tr>`;
   }).join('');
-  document.getElementById('body-bshui').innerHTML = html || '<tr><td colspan="10" class="loading-box">無北水數據</td></tr>';
+  document.getElementById('body-bshui').innerHTML = html || '<tr><td colspan="9" class="loading-box">無北水數據</td></tr>';
 
   // Update ticker
   const sbNet = display.reduce((a,s) => a+s.sb_net, 0);
@@ -1139,7 +1131,7 @@ function renderShort() {
   const shortAvgStr = fmtPct(avg);
   ['tick-short','tick-short2'].forEach(id => { const el=document.getElementById(id); if(el) el.textContent=shortAvgStr; });
 
-  const html = sorted.slice(0, getTableRows()).map((s,i) => {
+  const html = sorted.map((s,i) => {
     const diff = s.short_ratio - s.short_avg5;
     const diffClass = diff > 2 ? 'up-txt' : diff < -2 ? 'dn-txt' : '';
     const trend = diff > 2 ? '📈 上升' : diff < -2 ? '📉 下降' : '→ 平穩';
@@ -1172,7 +1164,7 @@ function renderCcass() {
   document.getElementById('cc-avg-name').textContent = topAvg ? topAvg.name_chi : '--';
   document.getElementById('cc-avg-val').textContent = topAvg && topAvg.pct_delta != null ? (topAvg.pct_delta > 0 ? '+' : '') + topAvg.pct_delta.toFixed(2) + '%' : '--';
 
-  const html = sorted.slice(0, getTableRows()).map((s,i) => {
+  const html = sorted.map((s,i) => {
     const dClass = s.ccass_delta > 0 ? 'up-txt' : s.ccass_delta < 0 ? 'dn-txt' : '';
     const cClass = s.ccass_consec > 0 ? 'up-txt' : s.ccass_consec < 0 ? 'dn-txt' : '';
     return `<tr>
@@ -1358,7 +1350,7 @@ function renderCaiTable() {
   document.getElementById('cai-narrow').textContent = narrow;
   document.getElementById('cai-wide').textContent = wide;
 
-  const html = caiData.slice(0, getTableRows()).map((s,i) => `<tr>
+  const html = caiData.map((s,i) => `<tr>
     <td class="rank">${i+1}</td>
     <td><span class="name-cell">${s.name_chi}</span><span class="name-zh">${s.code}</span></td>
     <td class="num-r">${fmtM(s.tv5)}</td>
