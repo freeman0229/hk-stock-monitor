@@ -259,27 +259,43 @@ def get_daily_quotation(date: datetime = None) -> pd.DataFrame:
         return EMPTY_QUOTE
 
 # ── Source 2: Short selling ───────────────────────────────────────────────────
-SHORT_SELL_URL = "https://www.hkex.com.hk/eng/stat/smstat/ssturnover/ncms/ashtmain.htm"
+# Chinese version — 4 cols: 股票代號 名稱 沽空成交量 沽空成交額
+SHORT_SELL_URL = "https://www.hkex.com.hk/chi/stat/smstat/ssturnover/ncms/ashtmain_c.htm"
 EMPTY_SHORT    = pd.DataFrame(columns=["stock_code", "name", "short_volume", "short_turnover"])
 
+# Pattern: CODE  CHI_NAME  VOLUME  TURNOVER
+# The Chinese file is Big5-encoded; names contain CJK characters
 _SS_PAT = re.compile(
-    r"^\s{2,8}(\d{1,6})\s{1,3}([A-Z][A-Z0-9 \-&'./#+]{1,24}?)\s{2,}([\d,]+)\s+([\d,]+)\s*$"
+    r"^\s{0,8}(\d{1,6})\s{1,4}(.+?)\s{2,}([\d,]+)\s+([\d,]+)\s*$"
 )
+_SS_SKIP = {"股票代號", "沽空成交量", "合計", "TOTAL", "CODE", "NAME OF STOCK"}
 
 def get_short_sell_today() -> pd.DataFrame:
     try:
         resp = requests.get(SHORT_SELL_URL, headers=HEADERS, timeout=30)
         resp.raise_for_status()
+        # Chinese file is Big5 encoded
+        try:
+            text = resp.content.decode("big5", errors="replace")
+        except Exception:
+            text = resp.content.decode("latin-1", errors="replace")
         rows = []
-        for line in resp.content.decode("latin-1", errors="replace").splitlines():
+        for line in text.splitlines():
             m = _SS_PAT.match(line)
-            if m:
-                name = m.group(2).strip()
-                if name not in ("NAME OF STOCK", "CODE"):
-                    rows.append({"stock_code":     fmt_code(m.group(1)),
-                                 "name":           name,
-                                 "short_volume":   to_num(m.group(3)),
-                                 "short_turnover": to_num(m.group(4))})
+            if not m:
+                continue
+            code = fmt_code(m.group(1))
+            name = m.group(2).strip()
+            if not code or name in _SS_SKIP:
+                continue
+            sv = to_num(m.group(3))
+            st = to_num(m.group(4))
+            if sv <= 0 and st <= 0:
+                continue
+            rows.append({"stock_code":     code,
+                         "name":           name,
+                         "short_volume":   sv,
+                         "short_turnover": st})
         df = pd.DataFrame(rows) if rows else EMPTY_SHORT
         log.info("Short sell today: %d records", len(df))
         return df
@@ -290,8 +306,12 @@ def get_short_sell_today() -> pd.DataFrame:
 def save_short_sell(date: datetime, df: pd.DataFrame):
     if df.empty:
         return
-    records = {r.stock_code: {"sv": int(r.short_volume), "st": float(r.short_turnover)}
-               for r in df.itertuples()}
+    # Store all 4 columns: sv, st, and name
+    records = {r.stock_code: {
+        "sv":   int(r.short_volume),
+        "st":   float(r.short_turnover),
+        "name": r.name,
+    } for r in df.itertuples()}
     short_save_day(date, records)
     log.info("Saved short sell: %s (%d)", date.strftime("%Y-%m-%d"), len(records))
 

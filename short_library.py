@@ -13,14 +13,15 @@ Structure:
   "meta": {"year": 2026, "last_updated": "...", "total_days": N},
   "by_date": {
     "2026-03-19": {
-      "00700": {"sv": 1234567, "st": 456789012.0},
+      "00700": {"sv": 1234567, "st": 456789012.0, "name": "騰訊控股"},
       ...
     }
   }
 }
 
-sv = short volume (shares)
-st = short turnover (HKD)
+sv   = short volume (shares)
+st   = short turnover (HKD)
+name = Chinese stock name from ashtmain_c.htm
 
 API for main.py:
   from short_library import save_day, get_short_history, all_stored_dates
@@ -76,7 +77,7 @@ def all_stored_dates() -> set:
 def save_day(d: datetime, records: dict):
     """
     Save one day's short selling data into the library.
-    records: {code: {"sv": int, "st": float}}
+    records: {code: {"sv": int, "st": float, "name": str}}
     """
     if not records:
         return
@@ -128,3 +129,23 @@ def get_short_ratio_history(code: str, n: int, before: str, tv_store: dict) -> l
         if len(result) >= n:
             break
     return result
+
+def get_short_name(code: str, before: str = None) -> str | None:
+    """
+    Return the most recent Chinese name for a stock from the short sell records.
+    Uses the most recent stored day (optionally before `before` date).
+    """
+    code5 = code.zfill(5)
+    for year in sorted(all_years(), reverse=True):
+        p = lib_path(year)
+        if not os.path.exists(p): continue
+        with open(p, encoding="utf-8") as f:
+            by_date = json.load(f).get("by_date", {})
+        for ds in sorted(by_date.keys(), reverse=True):
+            if before and ds >= before: continue
+            entry = by_date[ds].get(code5)
+            if entry and isinstance(entry, dict):
+                name = entry.get("name")
+                if name:
+                    return name
+    return None
