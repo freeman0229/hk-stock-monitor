@@ -191,21 +191,18 @@ def get_daily_quotation(date: datetime = None) -> pd.DataFrame:
         pre  = BeautifulSoup(text, "html.parser").find("pre")
         body = pre.get_text() if pre else text
 
-        # Pattern B only — the full HKEX line format:
-        # CODE  NAME  CHI  HKD  PRV  BID  CLOSE  HIGH  LOW  CLOSE  SHARES  TURNOVER
-        # group(4)=shares  group(5)=turnover (8+ digits ensures it's HKD not share count)
-        # Columns: CODE NAME CHI CURR PRV BID ASK OPEN HIGH LOW CLOSE SHARES TURNOVER
-        #            1    2    3   4    5   6   7   8    9   10  11    12     13
+        # Pattern B: CODE NAME CHI CURR PRV BID ASK HIGH LOW CLOSE SHARES TURNOVER
+        # Verified format of d{YYMMDD}c.htm — 6 price columns, then shares, then turnover.
+        # group(1)=code  group(2)=eng  group(3)=chi  group(4)=shares  group(5)=turnover
         PAT = re.compile(
-            r"^[\*\s]{0,5}(\d{1,5})\s+([A-Z][A-Z0-9 \-&'./#+]{1,22}?)\s{2,}"
+            r"^[\*\s]{0,5}(\d{1,5})\s+(\S[^\u3000\n]{1,22}?)\s{2,}"
             r"(.{1,30}?)\s*(?:HKD|USD|CNY|EUR|GBP)\s+"
-            r"[\d,.]+\s+[\d,.]+\s+[\d,.]+\s+[\d,.]+\s+[\d,.]+\s+[\d,.]+\s+"
-            r"([\d,.]+)\s+"            # group(4) = closing price (col 11)
-            r"([\d,]{5,})\s+"          # group(5) = shares traded (col 12)
-            r"([\d,]{8,})\s*$"         # group(6) = HKD turnover  (col 13)
+            r"[\d,.NA-]+\s+[\d,.NA-]+\s+[\d,.NA-]+\s+[\d,.NA-]+\s+[\d,.NA-]+\s+[\d,.NA-]+\s+"
+            r"([\d,]{5,})\s+"          # group(4) = shares
+            r"([\d,]{8,})\s*$"         # group(5) = HKD turnover
         )
 
-        best     = {}   # code -> record; kept for dedup (same code = take max turnover)
+        best     = {}
         name_map = {}
 
         for line in body.splitlines():
@@ -214,13 +211,12 @@ def get_daily_quotation(date: datetime = None) -> pd.DataFrame:
                 continue
             code_int = int(m.group(1))
             if code_int > 9999:
-                continue   # skip warrants (10000+), CBBCs (50000+), structured products
+                continue
             code     = str(code_int).zfill(5)
             name_eng = m.group(2).strip()
             name_chi = re.sub(r'[\u3000\uff20\uff64\s]+$', '', m.group(3)).strip()
-            close    = float(m.group(4).replace(',', ''))   # closing price (col 11)
-            volume   = float(m.group(5).replace(',', ''))   # shares traded (col 12)
-            turnover = float(m.group(6).replace(',', ''))   # HKD turnover  (col 13)
+            volume   = float(m.group(4).replace(',', ''))
+            turnover = float(m.group(5).replace(',', ''))
             if not _is_valid_chinese(name_chi):
                 name_chi = name_eng
             if turnover <= 0:
@@ -229,7 +225,7 @@ def get_daily_quotation(date: datetime = None) -> pd.DataFrame:
                 zh = get_zh_name(code) or (name_chi if _is_valid_chinese(name_chi) else name_eng)
                 best[code] = {"stock_code": code, "name": name_eng,
                               "name_chi": zh, "turnover": turnover,
-                              "shares": volume, "close": close}
+                              "shares": volume, "close": 0.0}
                 if not get_zh_name(code):
                     name_map[code] = {"en": name_eng, "zh": zh}
 

@@ -156,11 +156,14 @@ def save_day(d: date, stock_code: str, records: list):
 
 # ── Turnover filter ───────────────────────────────────────────────────────────
 
-def get_qualifying_stocks(d: date) -> list:
+def get_qualifying_stocks(ref_date: date = None) -> list:
     """
     Return stock codes with turnover >= MIN_TURNOVER from the HKEX daily
-    quotation file for date d. Skips warrants/CBBCs (code > 9999).
+    quotation file. Always uses today (or ref_date if specified) as the
+    reference — so historical CCASS fetches use a current stock universe.
+    Skips warrants/CBBCs (code > 9999).
     """
+    d        = ref_date or date.today()
     date_str = d.strftime("%y%m%d")
     url      = QUOT_URL.format(date=date_str)
     try:
@@ -174,25 +177,26 @@ def get_qualifying_stocks(d: date) -> list:
         pre  = BeautifulSoup(text, "html.parser").find("pre")
         body = pre.get_text() if pre else text
 
-        # Pattern B — same as main.py (confirmed working):
-        # Columns: CODE NAME CHI CURR PRV BID ASK OPEN HIGH LOW CLOSE SHARES TURNOVER
-        #           1    2    3   4    5   6   7   8    9   10  11    12     13
-        # group(6) = col 13 = HKD turnover (8+ digits)
+        # Pattern B: CODE NAME CHI CURR PRV BID ASK HIGH LOW CLOSE SHARES TURNOVER
+        # group(5) = HKD turnover (last column)
         PAT = re.compile(
-            r"^[\*\s]{0,5}(\d{1,5})\s+([A-Z][A-Z0-9 \-&'./#+]{1,22}?)\s{2,}"
+            r"^[\*\s]{0,5}(\d{1,5})\s+(\S[^\u3000\n]{1,22}?)\s{2,}"
             r"(.{1,30}?)\s*(?:HKD|USD|CNY|EUR|GBP)\s+"
-            r"[\d,.]+\s+[\d,.]+\s+[\d,.]+\s+[\d,.]+\s+[\d,.]+\s+[\d,.]+\s+"
-            r"([\d,.]+)\s+"            # col 11: close price
-            r"([\d,]{5,})\s+"          # col 12: shares
-            r"([\d,]{8,})\s*$"         # col 13: HKD turnover
+            r"[\d,.NA-]+\s+[\d,.NA-]+\s+[\d,.NA-]+\s+[\d,.NA-]+\s+[\d,.NA-]+\s+[\d,.NA-]+\s+"
+            r"[\d,]{5,}\s+"            # SHARES (skip)
+            r"([\d,]{8,})\s*$"         # group(4) = HKD TURNOVER
         )
-        codes = []
+        best = {}
         for line in body.splitlines():
             m = PAT.match(line)
             if not m: continue
-            if int(m.group(1)) > 9999: continue
-            if float(m.group(6).replace(",", "")) >= MIN_TURNOVER:
-                codes.append(str(int(m.group(1))).zfill(5))
+            code_int = int(m.group(1))
+            if code_int > 9999: continue
+            code = str(code_int).zfill(5)
+            tv   = float(m.group(4).replace(",", ""))
+            if tv > 0 and (code not in best or tv > best[code]):
+                best[code] = tv
+        codes = [c for c, tv in best.items() if tv >= MIN_TURNOVER]
 
         log.info("Qualifying stocks %s: %d (tv ≥ %s HKD)",
                  d.isoformat(), len(codes), f"{MIN_TURNOVER:,}")
@@ -295,13 +299,16 @@ def build(update_only: bool = False, specific_date: date = None):
         log.info("Already up to date")
         return
 
+    # Fetch qualifying stock list ONCE from today's quotation — used for all dates.
+    codes = get_qualifying_stocks()
+    if not codes:
+        log.error("Could not get qualifying stocks from today's quotation — aborting")
+        return
+    log.info("Using %d qualifying stocks (tv ≥ %s) for all dates",
+             len(codes), f"{MIN_TURNOVER:,}")
+
     for di, d in enumerate(dates_to_fetch, 1):
         log.info("── [%d/%d] %s ──", di, len(dates_to_fetch), d.isoformat())
-
-        codes = get_qualifying_stocks(d)
-        if not codes:
-            log.warning("No qualifying stocks for %s — skipping", d.isoformat())
-            continue
 
         lib = load_year(d.year)
         ds  = d.isoformat()
