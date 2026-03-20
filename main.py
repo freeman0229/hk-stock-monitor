@@ -643,6 +643,23 @@ def run_analysis():
         }
     log.info("Southbound top10: %d stocks for %s", len(sb_map), today_ds)
 
+    # If today's data not yet published, fall back to the most recent available day
+    sb_date_used = today_ds
+    if not sb_map:
+        prev_td = last_trading_day(trading_day - timedelta(days=1))
+        prev_ds = prev_td.strftime("%Y-%m-%d")
+        for s in get_top10(prev_ds):
+            sb_map[s["code"]] = {
+                "sb_buy":  s["buy"],
+                "sb_sell": s["sell"],
+                "sb_net":  s["buy"] - s["sell"],
+            }
+        if sb_map:
+            sb_date_used = prev_ds
+            log.info("Southbound top10: using previous day %s (%d stocks)", prev_ds, len(sb_map))
+        else:
+            log.warning("Southbound top10: no data for today or yesterday")
+
     # 5a. Compute sb_consec and sb_net_prev for each stock in sb_map
     # Logic: look back through top10 history; count consecutive days with net > 0
     # (buy > sell). A day the stock is absent = fell off table = streak reset.
@@ -756,6 +773,7 @@ def run_analysis():
 
     # 7. Persist
     output = {"update_time": trading_day.strftime("%Y-%m-%d %H:%M"),
+              "sb_date": sb_date_used,
               "name_map": load_store(NAME_MAP_FILE), "stocks": results}
     with open("data.json", "w", encoding="utf-8") as f:
         json.dump(output, f, ensure_ascii=False, separators=(",", ":"))
