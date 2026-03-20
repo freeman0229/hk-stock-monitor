@@ -1002,14 +1002,12 @@ function drawSbChart(sorted) {
 }
 
 function renderBshui() {
-  // Pipeline: read all stocks with any SB flow → join overall turnover → sort by
-  // overall market turnover high→low. This shows the big picture: which of today's
-  // most-traded stocks had mainland money in them, and how much of the tape was SB.
-  // Show ALL stocks sorted by overall turnover — SB participation overlaid.
-  // No filter: stocks with zero SB flow still appear with empty SB columns.
+  // Only stocks with SB flow today — sorted by overall market turnover high→low.
+  // This answers: "of the stocks mainland money touched, which were biggest by tape?"
   const sorted = [...allStocks]
+    .filter(s => s.sb_buy > 0 || s.sb_sell > 0 || s.sb_total > 0)
     .sort((a, b) => (b.turnover || 0) - (a.turnover || 0));
-  console.log(`[bshui] allStocks=${allStocks.length} sb_active=${sorted.filter(s=>s.sb_total>0).length}`);
+  console.log(`[bshui] allStocks=${allStocks.length} sb_active=${sorted.length}`);
   const display = sorted;
 
   // No sb data yet — show message, keep last cached chart
