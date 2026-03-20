@@ -48,7 +48,7 @@ HEADERS = {
 # Chinese mutualmarket page — cleaner table, GET-based with txtShareholdingDate param
 BASE_URL   = "https://www3.hkexnews.hk/sdw/search/mutualmarket_c.aspx"
 SLEEP_SEC  = 1.5
-START_DATE = date.today() - timedelta(days=365)
+START_DATE = date(2025, 1, 1)
 
 
 # ── Trading day helpers ───────────────────────────────────────────────────────
@@ -82,7 +82,7 @@ def lib_path(year: int) -> str:
     return f"ccass_{year}.json"
 
 def all_years() -> list:
-    return sorted({START_DATE.year, date.today().year})
+    return list(range(START_DATE.year, date.today().year + 1))
 
 def load_year(year: int) -> dict:
     p = lib_path(year)
@@ -113,6 +113,24 @@ def all_stored_dates() -> set:
             with open(lib_path(year), encoding="utf-8") as f:
                 stored.update(json.load(f).get("by_date", {}).keys())
     return stored
+
+
+# ── API for main.py ───────────────────────────────────────────────────────────
+
+def save_day(d, records: dict):
+    """
+    Save one day's CCASS data into the library.
+    records: {code: {"sh": int, "pct": float}}
+    Accepts a datetime or date object, or a YYYY-MM-DD string.
+    """
+    if not records:
+        return
+    ds   = d.strftime("%Y-%m-%d") if hasattr(d, "strftime") else str(d)
+    year = int(ds[:4])
+    lib  = load_year(year)
+    lib["by_date"][ds] = records
+    save_year(year, lib)
+    log.info("Saved CCASS to ccass_%d.json: %s (%d stocks)", year, ds, len(records))
 
 
 # ── Fetch ─────────────────────────────────────────────────────────────────────

@@ -5,7 +5,9 @@ import holidays
 from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
 from stock_ref import get_zh_name, get_industry, get_type, STOCKS
-from ccass_library import get_pct_history, get_sh_history, save_year, load_year
+from ccass_library import (get_pct_history, get_sh_history,
+                            save_day as ccass_save_day,
+                            all_stored_dates as ccass_all_stored_dates)
 from short_library import save_day as short_save_day, get_short_history, get_short_ratio_history
 from turnover_library import (save_day as tv_save_day, get_tv_history,
                                get_vol_history,
@@ -461,10 +463,6 @@ def _turnover_avg(code: str, before: str, n: int) -> float:
     vals = get_tv_history(code, n, before)
     return sum(vals) / len(vals) if vals else 0.0
 
-def _value_at_tv(code: str, date_key: str) -> float:
-    """Return turnover for a stock on YYYYMMDD date key."""
-    return get_tv(code, date_key)
-
 # ── Stock classification ──────────────────────────────────────────────────────
 def classify_stock(code: str, name: str) -> str:
     """Returns type from stock_ref, falls back to keyword matching."""
@@ -524,9 +522,8 @@ def classify_insight(code, stock_type, short_ratio, short_avg5, short_ratio_t2,
 # ── Bootstrap ─────────────────────────────────────────────────────────────────
 def bootstrap_history(days: int = 10):
     from turnover_library import all_stored_dates as tv_all_stored
-    existing_tv = tv_all_stored()
-    from ccass_library import all_stored_dates
-    existing_ccass = all_stored_dates()
+    existing_tv    = tv_all_stored()
+    existing_ccass = ccass_all_stored_dates()
 
     target, dates_to_fetch, checked = last_trading_day(datetime.now() - timedelta(days=1)), [], 0
     while len(dates_to_fetch) < days and checked < 30:
@@ -552,13 +549,8 @@ def bootstrap_history(days: int = 10):
         if d.strftime("%Y-%m-%d") not in existing_ccass:
             df_c = get_ccass_southbound(d)
             if not df_c.empty:
-                yr  = d.year
-                lib = load_year(yr)
-                lib["by_date"][d.strftime("%Y-%m-%d")] = {
-                    r.stock_code: {"sh": r.shareholding, "pct": r.pct_listed}
-                    for r in df_c.itertuples()
-                }
-                save_year(yr, lib)
+                ccass_save_day(d, {r.stock_code: {"sh": r.shareholding, "pct": r.pct_listed}
+                                   for r in df_c.itertuples()})
                 log.info("Bootstrap CCASS: %s (%d)", key, len(df_c))
             time.sleep(1)
 
@@ -619,14 +611,8 @@ def run_analysis():
                                             today_pct_map=ccass_pct_map)
     # Save today's CCASS into the year-split library
     if not df_ccass.empty:
-        year = trading_day.year
-        lib  = load_year(year)
-        lib["by_date"][today_ds] = {
-            r.stock_code: {"sh": r.shareholding, "pct": r.pct_listed}
-            for r in df_ccass.itertuples()
-        }
-        save_year(year, lib)
-        log.info("Saved CCASS to ccass_%d.json: %s (%d stocks)", year, today_ds, len(df_ccass))
+        ccass_save_day(trading_day, {r.stock_code: {"sh": r.shareholding, "pct": r.pct_listed}
+                                     for r in df_ccass.itertuples()})
     ccass_delta_map     = dict(zip(df_cs["stock_code"], df_cs["ccass_delta"]))
     ccass_consec_map    = dict(zip(df_cs["stock_code"], df_cs["ccass_consec"]))
     ccass_streak_pct_map= dict(zip(df_cs["stock_code"], df_cs["ccass_streak_pct"]))
@@ -722,7 +708,7 @@ def run_analysis():
         # deviation of today's pct from 30-day avg (percentage points)
         pct_dev30  = round(pct_listed - pct_avg30_lvl, 4) if pct_avg30_lvl > 0 else 0.0
 
-        tv_t2_raw      = _value_at_tv(code, t2_key)
+        tv_t2_raw      = get_tv(code, t2_key)
         _t2_short      = get_short_history(code, 1, t2_date.strftime("%Y-%m-%d") + "z")
         short_tv_t2    = _t2_short[0]["st"] if _t2_short else 0.0
         short_ratio_t2 = round(short_tv_t2 / tv_t2_raw * 100, 2) if tv_t2_raw > 0 else short_ratio
@@ -788,7 +774,7 @@ def run_analysis():
         top         = results[0]
         top_rc      = f" [↑{top['rank_change']}]" if top['rank_change'] > 0 else (" [new]" if top['rank_new'] else "")
         lines = [
-            "📊 港股 Top 100 策略報告",
+            "📊 港股策略板",
             f"時間: {output['update_time']}",
             f"榜首: {top['name_chi']} ({top['code']}){top_rc} 成交額 {top['turnover']:,}",
             f"異動股: {len(flagged)} 隻 | 新進榜: {len(new_entries)} 隻",

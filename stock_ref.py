@@ -141,7 +141,6 @@ STOCKS: dict[str, dict] = {
     # ── 金屬礦產 ─────────────────────────────────────────────────────────────
     "01088": {"en":"CHINA SHENHUA",         "zh":"中國神華",          "industry":"MET","ind_zh":"金屬礦產", "type":"stable"},
     "00358": {"en":"JIANGXI COPPER",        "zh":"江西銅業股份",      "industry":"MET","ind_zh":"金屬礦產", "type":"general"},
-    "03750": {"en":"CATL",                  "zh":"寧德時代",          "industry":"MET","ind_zh":"科技",     "type":"bluechip"},
 
     # ── 運輸物流 ─────────────────────────────────────────────────────────────
     "00293": {"en":"CATHAY PAC AIR",        "zh":"國泰航空",          "industry":"TRN","ind_zh":"運輸",     "type":"bluechip"},

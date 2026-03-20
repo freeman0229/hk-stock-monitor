@@ -291,8 +291,7 @@ def build(codes: list = None, update_only: bool = False):
     log.info("DI library: %d stocks, %d years", len(codes), len(years))
 
     for year in years:
-        lib     = load_year(year)
-        changed = False
+        lib = load_year(year)
 
         for i, code in enumerate(codes, 1):
             # Skip completed past years unless missing from lib
@@ -311,7 +310,6 @@ def build(codes: list = None, update_only: bool = False):
 
             lib["by_stock"][code] = records
             if records:
-                changed = True
                 log.info("  %s %d: %d filings", code, year, len(records))
 
         save_year(year, lib)
