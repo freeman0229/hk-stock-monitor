@@ -148,6 +148,71 @@ body {
 }
 #sb-summary {
   grid-template-columns: repeat(3, 1fr);
+}
+
+/* ── Mobile columns ── */
+.mob-hide { /* hidden on phones, shown on desktop */ }
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  :root { --header-h: 46px; --tab-h: 40px; }
+
+  /* Header */
+  #header { padding: 0 12px; gap: 8px; }
+  .logo { font-size: 18px; }
+  .logo span { display: none; }
+  .header-meta { gap: 8px; font-size: 11px; }
+  .header-meta span:first-child { display: none; }
+
+  /* Ticker */
+  #ticker { height: 26px; font-size: 11px; }
+  .tick-item { padding: 0 12px; }
+
+  /* Tab bar — scrollable, no wrapping */
+  #tabbar {
+    padding: 0 8px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  #tabbar::-webkit-scrollbar { display: none; }
+  .tab-btn { padding: 0 14px; font-size: 13px; flex-shrink: 0; }
+
+  /* Panels */
+  .panel { padding: 10px 8px; }
+
+  /* Summary cards */
+  .summary-bar { grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 12px; }
+  #sb-summary  { grid-template-columns: repeat(2, 1fr); }
+  .sum-val { font-size: 18px; }
+  .sum-card { padding: 10px 12px; }
+
+  /* Section headings */
+  .sec-sub { display: none; }
+
+  /* Tables — horizontal scroll container */
+  .tbl-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  table { font-size: 12px; min-width: 480px; }
+  thead th { padding: 7px 8px; font-size: 11px; }
+  tbody td  { padding: 7px 8px; }
+
+  /* Hide lower-priority columns on phones */
+  .mob-hide { display: none; }
+
+  /* Chart controls wrap tighter */
+  .cai-controls { gap: 6px; }
+  .cai-controls select, .cai-controls input { padding: 4px 8px; font-size: 12px; }
+  .cai-chart-area { height: 300px; }
+
+  /* Footer */
+  #footer { font-size: 10px; padding: 16px 12px; }
+}
+
+@media (max-width: 480px) {
+  .summary-bar { grid-template-columns: 1fr 1fr; }
+  #sb-summary  { grid-template-columns: 1fr; }
+  .sum-val { font-size: 16px; }
+}
 .sum-card {
   background: var(--card);
   border: 1px solid var(--border);
@@ -421,10 +486,10 @@ tbody td { padding: 9px 12px; vertical-align: middle; }
           <th class="rank">#</th>
           <th>股票</th>
           <th class="num-r" data-col="sb_net">淨流入</th>
-          <th class="num-r" data-col="sb_buy">買入</th>
-          <th class="num-r" data-col="sb_sell">賣出</th>
-          <th class="num-r" data-col="ccass_delta">CCASS變動%</th>
-          <th class="num-r" data-col="ccass_consec">連續日數</th>
+          <th class="num-r mob-hide" data-col="sb_buy">買入</th>
+          <th class="num-r mob-hide" data-col="sb_sell">賣出</th>
+          <th class="num-r mob-hide" data-col="ccass_delta">CCASS變動%</th>
+          <th class="num-r mob-hide" data-col="ccass_consec">連續日數</th>
           <th data-col="insight">信號</th>
         </tr>
       </thead>
@@ -455,9 +520,9 @@ tbody td { padding: 9px 12px; vertical-align: middle; }
           <th class="rank">#</th>
           <th>股票</th>
           <th class="num-r" data-col="short_ratio">今日沽空%</th>
-          <th class="num-r" data-col="short_avg5">5日均值%</th>
-          <th class="num-r" data-col="short_ratio_t2">T-2沽空%</th>
-          <th class="num-r" data-col="turnover">成交額(萬)</th>
+          <th class="num-r mob-hide" data-col="short_avg5">5日均值%</th>
+          <th class="num-r mob-hide" data-col="short_ratio_t2">T-2沽空%</th>
+          <th class="num-r mob-hide" data-col="turnover">成交額(萬)</th>
           <th>沽空趨勢</th>
           <th data-col="insight">信號</th>
         </tr>
@@ -489,9 +554,9 @@ tbody td { padding: 9px 12px; vertical-align: middle; }
           <th class="rank">#</th>
           <th>股票</th>
           <th class="num-r" data-col="ccass_delta">今日持倉變動%</th>
-          <th class="num-r" data-col="pct_delta">今日變動%</th>
-          <th class="num-r" data-col="ccass_consec">連續日數</th>
-          <th class="num-r" data-col="turnover">成交額(萬)</th>
+          <th class="num-r mob-hide" data-col="pct_delta">今日變動%</th>
+          <th class="num-r mob-hide" data-col="ccass_consec">連續日數</th>
+          <th class="num-r mob-hide" data-col="turnover">成交額(萬)</th>
           <th>行業</th>
           <th data-col="insight">信號</th>
         </tr>
@@ -581,6 +646,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.classList.add('active');
     document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
     if (btn.dataset.tab === 'cai' && allStocks.length) drawCai();
+    if (btn.dataset.tab === 'bshui' && allStocks.length) renderBshui();
   });
 });
 
@@ -626,20 +692,43 @@ function miniBar(val, max, cls) {
 }
 
 // ── Load data.json ────────────────────────────────────────────────────────
+const CACHE_KEY = 'hk_dashboard_data';
+
+function applyData(d, stale) {
+  allStocks  = d.stocks || [];
+  updateTime = d.update_time || '';
+  const staleMark = stale ? ' ⏳' : '';
+  document.getElementById('hdr-time').textContent =
+    updateTime ? '更新: ' + updateTime + staleMark : '';
+  renderAll();
+}
+
 async function loadData() {
+  // 1. Show cached data immediately if available
   try {
-    const r = await fetch('data.json');
-    if (!r.ok) throw new Error();
+    const cached = localStorage.getItem(CACHE_KEY);
+    if (cached) {
+      const d = JSON.parse(cached);
+      applyData(d, true);   // stale indicator shown
+    }
+  } catch(e) { /* ignore bad cache */ }
+
+  // 2. Fetch fresh data in background
+  try {
+    const r = await fetch('data.json?t=' + Date.now());  // bust cache
+    if (!r.ok) throw new Error(r.status);
     const d = await r.json();
-    allStocks = d.stocks || [];
-    updateTime = d.update_time || '';
-    document.getElementById('hdr-time').textContent = updateTime ? '更新: ' + updateTime : '';
-    renderAll();
+    localStorage.setItem(CACHE_KEY, JSON.stringify(d));  // save for next load
+    applyData(d, false);   // fresh — remove stale indicator
   } catch(e) {
-    allStocks = generateMockData();
-    updateTime = new Date().toLocaleString('zh-HK');
-    document.getElementById('hdr-time').textContent = '更新: ' + updateTime + ' (示範)';
-    renderAll();
+    // Fresh fetch failed — if we already showed cached data, keep it
+    if (!allStocks.length) {
+      // Nothing cached either — fall back to mock
+      allStocks  = generateMockData();
+      updateTime = new Date().toLocaleString('zh-HK');
+      document.getElementById('hdr-time').textContent = '更新: ' + updateTime + ' (示範)';
+      renderAll();
+    }
   }
 }
 
@@ -709,10 +798,12 @@ function drawSbChart(sorted) {
   const canvas = document.getElementById('sbChart');
   if (!canvas) return;
   const stocks = sorted.slice(0, 30);
-  const ROW_H = 28, PAD_LEFT = 130, PAD_RIGHT = 80, PAD_TOP = 8, PAD_BOT = 20;
-  const W = canvas.parentElement.clientWidth || 760;
+  if (!stocks.length) return;
+  const ROW_H = 28, PAD_LEFT = 140, PAD_RIGHT = 90, PAD_TOP = 8, PAD_BOT = 20;
+  const W = canvas.parentElement.offsetWidth || canvas.parentElement.clientWidth || 700;
   const H = PAD_TOP + stocks.length * ROW_H + PAD_BOT;
   canvas.width = W; canvas.height = H;
+  canvas.style.height = H + 'px';
   const ctx = canvas.getContext('2d');
   ctx.clearRect(0, 0, W, H);
 
@@ -778,7 +869,7 @@ function drawSbChart(sorted) {
     // stock name + indicators
     ctx.fillStyle = '#222';
     ctx.font = `500 12px "Noto Sans TC", sans-serif`;
-    const nameLabel = (s.name || s.name_chi) + consecLabel;
+    const nameLabel = (s.name_chi || s.name) + consecLabel;
     ctx.fillText(nameLabel, 94, cy);
 
     // bar
@@ -819,10 +910,13 @@ function drawSbChart(sorted) {
 }
 
 function renderBshui() {
-  const sorted = [...allStocks].filter(s => s.sb_buy > 0 || s.sb_net !== 0).sort((a,b) => b.sb_net - a.sb_net);
-  const topBuy = sorted[0];
-  const topSell = [...sorted].sort((a,b) => a.sb_net - b.sb_net)[0];
-  const topConsec = [...sorted].sort((a,b) => (b.sb_consec||0) - (a.sb_consec||0))[0];
+  // Show all stocks sorted by sb_net; stocks not in top10 will have sb_net=0
+  const sorted = [...allStocks].filter(s => s.sb_net !== 0).sort((a,b) => b.sb_net - a.sb_net);
+  // Fall back to all stocks if none have sb data (e.g. demo mode)
+  const display = sorted.length ? sorted : [...allStocks].sort((a,b) => (a.rank||99) - (b.rank||99));
+  const topBuy = display[0];
+  const topSell = [...display].sort((a,b) => a.sb_net - b.sb_net)[0];
+  const topConsec = [...display].sort((a,b) => (b.sb_consec||0) - (a.sb_consec||0))[0];
 
   document.getElementById('sb-top-buy').textContent = topBuy ? fmtM(topBuy.sb_net) : '--';
   document.getElementById('sb-top-buy-name').textContent = topBuy ? topBuy.name_chi : '--';
@@ -832,37 +926,38 @@ function renderBshui() {
   document.getElementById('sb-consec').textContent = topConsecVal >= 2 ? topConsecVal + '日' : '';
   document.getElementById('sb-consec-name').textContent = topConsecVal >= 2 ? topConsec.name_chi : '';
 
-  // Draw chart — compute sb_net rank change (today's sb_net position vs yesterday's)
-  const sbStocksWithPrev = sorted.filter(s => (s.sb_net_prev || 0) !== 0 || s.sb_net !== 0);
-  const prevSorted = [...sorted].sort((a,b) => (b.sb_net_prev||0) - (a.sb_net_prev||0));
+  // Draw chart — compute sb_net rank change
+  const prevSorted = [...display].sort((a,b) => (b.sb_net_prev||0) - (a.sb_net_prev||0));
   const prevRankMap = {};
   prevSorted.forEach((s,i) => { prevRankMap[s.code] = i + 1; });
-  const sortedWithRankChange = sorted.map((s,i) => {
+  const sortedWithRankChange = display.map((s,i) => {
     const todayRank = i + 1;
     const prevRank  = prevRankMap[s.code];
     const sbRankChange = prevRank != null ? prevRank - todayRank : null;
     return { ...s, sb_rank_change: sbRankChange };
   }).sort((a,b) => (a.rank || 999) - (b.rank || 999));
-  drawSbChart(sortedWithRankChange);
+
+  // Defer draw to next frame so DOM has correct dimensions
+  requestAnimationFrame(() => drawSbChart(sortedWithRankChange));
 
   // Build table rows
-  const html = sorted.slice(0,50).map((s,i) => {
+  const html = display.slice(0,50).map((s,i) => {
     const netClass = s.sb_net > 0 ? 'up-txt' : 'dn-txt';
     return `<tr>
       <td class="rank">${i+1}</td>
       <td><span class="name-cell">${s.name_chi}</span><span class="name-zh">${s.code}</span></td>
       <td class="num-r ${netClass}">${sign(s.sb_net)}${fmtM(s.sb_net)}</td>
-      <td class="num-r">${fmtM(s.sb_buy)}</td>
-      <td class="num-r">${fmtM(s.sb_sell)}</td>
-      <td class="num-r ${s.ccass_delta>0?'up-txt':s.ccass_delta<0?'dn-txt':''}">${s.pct_delta != null && s.pct_delta !== 0 ? (s.pct_delta > 0 ? '+' : '') + s.pct_delta.toFixed(2) + '%' : '—'}</td>
-      <td class="num-r ${s.ccass_consec>0?'up-txt':s.ccass_consec<0?'dn-txt':''}">${fmtConsec(s)}</td>
+      <td class="num-r mob-hide">${fmtM(s.sb_buy)}</td>
+      <td class="num-r mob-hide">${fmtM(s.sb_sell)}</td>
+      <td class="num-r mob-hide ${s.ccass_delta>0?'up-txt':s.ccass_delta<0?'dn-txt':''}">${s.pct_delta != null && s.pct_delta !== 0 ? (s.pct_delta > 0 ? '+' : '') + s.pct_delta.toFixed(2) + '%' : '—'}</td>
+      <td class="num-r mob-hide ${s.ccass_consec>0?'up-txt':s.ccass_consec<0?'dn-txt':''}">${fmtConsec(s)}</td>
       <td>${insightBadge(s.insight)}</td>
     </tr>`;
   }).join('');
   document.getElementById('body-bshui').innerHTML = html || '<tr><td colspan="8" class="loading-box">無北水數據</td></tr>';
 
   // Update ticker
-  const sbNet = sorted.reduce((a,s) => a+s.sb_net, 0);
+  const sbNet = display.reduce((a,s) => a+s.sb_net, 0);
   const sbStr = (sbNet>=0?'▲':'▼') + fmtM(Math.abs(sbNet));
   ['tick-sb','tick-sb2'].forEach(id => { const el=document.getElementById(id); if(el) { el.className='tv '+(sbNet>=0?'up-c':'dn-c'); el.textContent=sbStr; } });
 }
@@ -892,9 +987,9 @@ function renderShort() {
       <td class="rank">${i+1}</td>
       <td><span class="name-cell">${s.name_chi}</span><span class="name-zh">${s.code}</span></td>
       <td class="num-r ${s.short_ratio > 20 && s.stock_type!=='etf' ? 'up-txt' : ''}">${fmtPct(s.short_ratio)}</td>
-      <td class="num-r">${fmtPct(s.short_avg5)}</td>
-      <td class="num-r">${fmtPct(s.short_ratio_t2)}</td>
-      <td class="num-r">${fmtM(s.turnover)}</td>
+      <td class="num-r mob-hide">${fmtPct(s.short_avg5)}</td>
+      <td class="num-r mob-hide">${fmtPct(s.short_ratio_t2)}</td>
+      <td class="num-r mob-hide">${fmtM(s.turnover)}</td>
       <td class="${diffClass}">${trend}</td>
       <td>${insightBadge(s.insight)}</td>
     </tr>`;
@@ -924,9 +1019,9 @@ function renderCcass() {
       <td class="rank">${i+1}</td>
       <td><span class="name-cell">${s.name_chi}</span><span class="name-zh">${s.code} · ${s.industry_zh||'—'}</span></td>
       <td class="num-r ${dClass}">${s.pct_delta != null && s.pct_delta !== 0 ? (s.pct_delta > 0 ? '+' : '') + s.pct_delta.toFixed(2) + '%' : '—'}</td>
-      <td class="num-r">${s.pct_delta != null ? (s.pct_delta > 0 ? '+' : '') + s.pct_delta.toFixed(2) + '%' : '—'}</td>
-      <td class="num-r ${cClass}">${fmtConsec(s)}</td>
-      <td class="num-r">${fmtM(s.turnover)}</td>
+      <td class="num-r mob-hide">${s.pct_delta != null ? (s.pct_delta > 0 ? '+' : '') + s.pct_delta.toFixed(2) + '%' : '—'}</td>
+      <td class="num-r mob-hide ${cClass}">${fmtConsec(s)}</td>
+      <td class="num-r mob-hide">${fmtM(s.turnover)}</td>
       <td>${s.industry_zh || '—'}</td>
       <td>${insightBadge(s.insight)}</td>
     </tr>`;
@@ -1176,8 +1271,10 @@ setInterval(updateTicker, 60000);
 document.getElementById('hdr-time').textContent = new Date().toLocaleString('zh-HK');
 loadData();
 window.addEventListener('resize', () => {
-  if (document.querySelector('.tab-btn[data-tab="cai"]').classList.contains('active')) drawCai();
-  if (document.querySelector('.tab-btn[data-tab="bshui"]').classList.contains('active')) renderBshui();
+  requestAnimationFrame(() => {
+    if (document.querySelector('.tab-btn[data-tab="cai"]').classList.contains('active')) drawCai();
+    if (document.querySelector('.tab-btn[data-tab="bshui"]').classList.contains('active')) renderBshui();
+  });
 });
 </script>
 </body>
