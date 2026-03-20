@@ -1,6 +1,6 @@
 name: Daily Sync
 
-"on":
+on:
   schedule:
     - cron: '0 12 * * 1-5'   # 12:00 UTC / 20:00 HKT (Mon–Fri)
     - cron: '0 2 * * 6'       # 02:00 UTC / 10:00 HKT (Saturday)
@@ -45,8 +45,11 @@ jobs:
         with: { python-version: '3.11', cache: 'pip' }
       - run: pip install -r requirements.txt
 
-      - name: Update Stock Connect top10 (today only)
-        run: python sc_top10_library.py --update
+      - name: Update Stock Connect top10 (today + repair incomplete history)
+        run: python sc_top10_library.py --reparse
+
+      - name: Refresh CCASS participant list (weekly)
+        run: python ccass_participant_library.py --update
 
       - name: Run daily analysis
         env:
