@@ -471,7 +471,7 @@ tbody td { padding: 9px 12px; vertical-align: middle; }
   <!-- Chart -->
   <div class="sec-head">
     <div class="sec-title">北水淨流入 — 綜合對比</div>
-    <div class="sec-sub">按淨流入額排序 ｜ 數據來源：CCASS</div>
+    <div class="sec-sub" id="sb-date-label">按淨流入額排序 ｜ 數據來源：CCASS</div>
   </div>
   <div style="background:var(--card);border:1px solid var(--border);border-radius:6px;padding:16px 12px 12px;margin-bottom:16px;overflow:visible;">
     <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px;font-size:12px;color:var(--muted);">
@@ -650,7 +650,8 @@ tbody td { padding: 9px 12px; vertical-align: middle; }
 <script>
 let allStocks = [];
 let updateTime = '';
-let lastChartData = [];  // cache last good chart render
+let sbDate = '';          // date of southbound data (may be yesterday)
+let lastChartData = [];   // cache last good chart render
 
 // ── Tabs ────────────────────────────────────────────────────────────────────
 document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -726,6 +727,7 @@ try {
 function applyData(d, stale) {
   allStocks  = d.stocks || [];
   updateTime = d.update_time || '';
+  sbDate     = d.sb_date || '';
   const staleMark = stale ? ' ⏳' : '';
   document.getElementById('hdr-time').textContent =
     updateTime ? '更新: ' + updateTime + staleMark : '';
@@ -984,13 +986,35 @@ function drawSbChart(sorted) {
 }
 
 function renderBshui() {
-  // Only stocks with actual sb flow data (in the Stock Connect top-10/20)
-  // With real data.json: sb_net !== 0 for top-10 stocks only
-  // In demo mode: all mock stocks have random sb_net — cap at 20
+  // Only stocks with actual sb flow data (Stock Connect top-10/20)
   const sorted = [...allStocks].filter(s => s.sb_net !== 0).sort((a,b) => b.sb_net - a.sb_net);
-  const display = sorted.length
-    ? sorted.slice(0, 20)
-    : [...allStocks].sort((a,b) => (a.rank||99) - (b.rank||99)).slice(0, 15);
+  const display = sorted.slice(0, 20);
+
+  // No sb data yet — show message, keep last cached chart
+  if (!display.length) {
+    document.getElementById('sb-top-buy').textContent = '--';
+    document.getElementById('sb-top-buy-name').textContent = '北水數據待更新';
+    document.getElementById('sb-top-sell').textContent = '--';
+    document.getElementById('sb-top-sell-name').textContent = '港股通今日尚未發布';
+    document.getElementById('sb-consec').textContent = '';
+    document.getElementById('sb-consec-name').textContent = '';
+    document.getElementById('body-bshui').innerHTML =
+      '<tr><td colspan="8"><div class="loading-box" style="padding:30px">📡 北水數據尚未發布，通常於每交易日 20:00 HKT 後更新</div></td></tr>';
+    // Keep last cached chart visible if available
+    if (lastChartData.length) setTimeout(() => drawSbChart(lastChartData), 50);
+    return;
+  }
+  // Update date label — show stale notice if sb data is from a previous day
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const sbLabel  = document.getElementById('sb-date-label');
+  if (sbLabel) {
+    if (sbDate && sbDate !== todayStr) {
+      sbLabel.innerHTML = `按淨流入額排序 ｜ <span style="color:var(--gold)">⏳ 顯示 ${sbDate} 數據（今日數據尚未發布）</span>`;
+    } else {
+      sbLabel.textContent = '按淨流入額排序 ｜ 數據來源：CCASS';
+    }
+  }
+
   const topBuy = display[0];
   const topSell = [...display].sort((a,b) => a.sb_net - b.sb_net)[0];
   const topConsec = [...display].sort((a,b) => (b.sb_consec||0) - (a.sb_consec||0))[0];
