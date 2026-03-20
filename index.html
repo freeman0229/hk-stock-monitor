@@ -150,68 +150,87 @@ body {
   grid-template-columns: repeat(3, 1fr);
 }
 
-/* ── Mobile columns ── */
-.mob-hide { /* hidden on phones, shown on desktop */ }
+/* ── Visibility helpers ── */
+.lap-only  { }
+.mob-hide  { }
+.land-hide { }
+.port-hide { }
 
-/* ── Responsive ── */
-@media (max-width: 768px) {
+/* ══════════════════════════════════════════════════
+   PHONE LANDSCAPE / TABLET  481–1023px
+   Ticker on, tabs scrollable, 2-col cards, fewer table cols
+══════════════════════════════════════════════════ */
+@media (max-width: 1023px) {
   :root { --header-h: 46px; --tab-h: 40px; }
-
-  /* Header */
+  .logo span { display: none; }
   #header { padding: 0 12px; gap: 8px; }
   .logo { font-size: 18px; }
-  .logo span { display: none; }
   .header-meta { gap: 8px; font-size: 11px; }
   .header-meta span:first-child { display: none; }
-
-  /* Ticker */
   #ticker { height: 26px; font-size: 11px; }
   .tick-item { padding: 0 12px; }
-
-  /* Tab bar — scrollable, no wrapping */
-  #tabbar {
-    padding: 0 8px;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-  }
+  #tabbar { padding: 0 8px; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
   #tabbar::-webkit-scrollbar { display: none; }
-  .tab-btn { padding: 0 14px; font-size: 13px; flex-shrink: 0; }
-
-  /* Panels */
-  .panel { padding: 10px 8px; }
-
-  /* Summary cards */
+  .tab-btn { padding: 0 16px; font-size: 13px; flex-shrink: 0; }
+  .panel { padding: 12px 10px; }
   .summary-bar { grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 12px; }
   #sb-summary  { grid-template-columns: repeat(2, 1fr); }
-  .sum-val { font-size: 18px; }
+  .sum-val { font-size: 20px; }
   .sum-card { padding: 10px 12px; }
-
-  /* Section headings */
   .sec-sub { display: none; }
-
-  /* Tables — horizontal scroll container */
   .tbl-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
   table { font-size: 12px; min-width: 480px; }
-  thead th { padding: 7px 8px; font-size: 11px; }
-  tbody td  { padding: 7px 8px; }
-
-  /* Hide lower-priority columns on phones */
-  .mob-hide { display: none; }
-
-  /* Chart controls wrap tighter */
+  thead th { padding: 7px 10px; font-size: 11px; }
+  tbody td  { padding: 7px 10px; }
+  .mob-hide  { display: none; }
+  .land-hide { display: none; }
   .cai-controls { gap: 6px; }
   .cai-controls select, .cai-controls input { padding: 4px 8px; font-size: 12px; }
   .cai-chart-area { height: 300px; }
-
-  /* Footer */
   #footer { font-size: 10px; padding: 16px 12px; }
 }
 
+/* ══════════════════════════════════════════════════
+   PHONE PORTRAIT  ≤ 480px
+   No ticker, 2×2 tab grid, compact cards, minimal table
+══════════════════════════════════════════════════ */
 @media (max-width: 480px) {
-  .summary-bar { grid-template-columns: 1fr 1fr; }
-  #sb-summary  { grid-template-columns: 1fr; }
+  :root { --header-h: 42px; }
+  #header { padding: 0 10px; gap: 6px; height: 42px; }
+  .logo { font-size: 16px; }
+  .header-meta { font-size: 11px; gap: 6px; }
+  #ticker { display: none; }
+  #tabbar {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    padding: 0;
+    overflow-x: visible;
+    top: 42px;
+  }
+  .tab-btn {
+    height: 38px; font-size: 13px; padding: 0 8px;
+    border-bottom: 2px solid var(--border);
+    border-right: 1px solid var(--border);
+    text-align: center; flex-shrink: unset;
+  }
+  .tab-btn.active { background: var(--red-lt); border-bottom-color: var(--red); }
+  .panel { padding: 8px 6px; }
+  .summary-bar, #sb-summary { grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 10px; }
+  .sum-card { padding: 8px 10px; }
   .sum-val { font-size: 16px; }
+  .sum-label { font-size: 10px; }
+  .sum-sub { font-size: 10px; }
+  .tbl-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  table { font-size: 12px; min-width: 280px; }
+  thead th { padding: 6px 8px; font-size: 11px; }
+  tbody td  { padding: 6px 8px; }
+  .mob-hide  { display: none; }
+  .land-hide { display: none; }
+  .port-hide { display: none; }
+  .name-zh   { display: none; }
+  .cai-chart-area { height: 220px; }
+  .cai-controls { flex-direction: column; align-items: flex-start; gap: 6px; }
+  #footer { display: none; }
 }
 .sum-card {
   background: var(--card);
@@ -396,12 +415,8 @@ tbody td { padding: 9px 12px; vertical-align: middle; }
   margin-top: 16px;
 }
 
-/* ── Responsive ── */
-@media (max-width: 768px) {
-  .summary-bar { grid-template-columns: repeat(2, 1fr); }
-  table { font-size: 12px; }
-  .tab-btn { padding: 0 12px; font-size: 13px; }
-}
+
+
 </style>
 </head>
 <body>
@@ -698,6 +713,17 @@ function applyData(d, stale) {
   const staleMark = stale ? ' ⏳' : '';
   document.getElementById('hdr-time').textContent =
     updateTime ? '更新: ' + updateTime + staleMark : '';
+
+  // Data sanity check
+  const sbStocks = allStocks.filter(s => s.sb_net !== 0);
+  if (sbStocks.length > 25) {
+    console.warn(`[data check] sb_net populated for ${sbStocks.length} stocks — expected ≤20 (Stock Connect top-10/20). Check sc_top10_library output.`);
+  }
+  const missingPct = allStocks.filter(s => s.pct_listed == null || s.pct_listed === 0).length;
+  if (missingPct > allStocks.length * 0.5) {
+    console.warn(`[data check] ${missingPct}/${allStocks.length} stocks missing pct_listed — CCASS data may not have loaded.`);
+  }
+
   renderAll();
 }
 
@@ -792,19 +818,32 @@ function toggleBshuiTable() {
   btn.textContent = open ? '收起明細 ▲' : '展開明細 ▼';
 }
 
+// ── Layout detection ─────────────────────────────────────────────────────
+function getLayout() {
+  const w = window.innerWidth;
+  if (w <= 480) return 'portrait';
+  if (w <= 1023) return 'landscape';
+  return 'laptop';
+}
+
 function drawSbChart(sorted) {
   const canvas = document.getElementById('sbChart');
   if (!canvas) return;
-  const stocks = sorted.slice(0, 30);
-  if (!stocks.length) return;
-  const ROW_H = 36, PAD_LEFT = 160, PAD_RIGHT = 100, PAD_TOP = 12, PAD_BOT = 24;
 
-  // Get width from the panel itself — always has a real rendered width
+  const layout = getLayout();
+  const maxStocks = layout === 'portrait' ? 10 : layout === 'landscape' ? 15 : 30;
+  const ROW_H    = layout === 'portrait' ? 44 : layout === 'landscape' ? 32 : 36;
+  const PAD_LEFT = layout === 'portrait' ? 110 : layout === 'landscape' ? 130 : 160;
+  const PAD_RIGHT= layout === 'portrait' ? 70  : layout === 'landscape' ? 80  : 100;
+  const PAD_TOP  = 12, PAD_BOT = 24;
+
+  const stocks = sorted.slice(0, maxStocks);
+  if (!stocks.length) return;
+
   const panel = document.getElementById('panel-bshui');
-  const W = Math.max(400, (panel ? panel.offsetWidth : window.innerWidth) - 40);
+  const W = Math.max(300, (panel ? panel.offsetWidth : window.innerWidth) - 20);
   const H = PAD_TOP + stocks.length * ROW_H + PAD_BOT;
 
-  // Set both the canvas coordinate space AND its displayed size
   canvas.width  = W;
   canvas.height = H;
   canvas.style.width  = W + 'px';
@@ -842,40 +881,41 @@ function drawSbChart(sorted) {
     if (i % 2 === 0) { ctx.fillStyle = 'rgba(0,0,0,.018)'; ctx.fillRect(0, y, W, ROW_H); }
 
     const consec = s.sb_consec || 0;
-
-    // rank change indicator — arrows anchored to sb_net rank position change
     const isNew = s.rank_new;
-    const rc    = s.sb_rank_change; // positive = moved up in sb_net table, null = no prev data
+    const rc    = s.sb_rank_change;
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
 
-    // row number = turnover rank from HKEX daily quotation
-    ctx.fillStyle = '#aaa';
-    ctx.font = '12px monospace';
-    ctx.fillText(String(s.rank || i+1).padStart(2,'0'), 4, cy);
+    if (layout === 'portrait') {
+      // Portrait: stock name only, no code/rank badge
+      ctx.fillStyle = '#222';
+      ctx.font = `500 13px "Noto Sans TC", sans-serif`;
+      const shortName = (s.name_chi || s.name).substring(0, 6);
+      ctx.fillText(shortName, 4, cy);
+    } else {
+      // Landscape / laptop: full labels
+      ctx.fillStyle = '#aaa';
+      ctx.font = '12px monospace';
+      ctx.fillText(String(s.rank || i+1).padStart(2,'0'), 4, cy);
 
-    // sb_net rank change badge: NEW / ▲n / ▼n / —
-    let rcColor = '#aaa', rcText = '—';
-    if (isNew || rc === null) { rcColor = '#c0252d'; rcText = 'NEW'; }
-    else if (rc > 0)          { rcColor = '#c0252d'; rcText = `▲${rc}`; }
-    else if (rc < 0)          { rcColor = '#1a7a3c'; rcText = `▼${Math.abs(rc)}`; }
-    ctx.fillStyle = rcColor;
-    ctx.font = `bold 12px "Noto Sans TC", sans-serif`;
-    ctx.fillText(rcText, 28, cy);
+      let rcColor = '#aaa', rcText = '—';
+      if (isNew || rc === null) { rcColor = '#c0252d'; rcText = 'NEW'; }
+      else if (rc > 0)          { rcColor = '#c0252d'; rcText = `▲${rc}`; }
+      else if (rc < 0)          { rcColor = '#1a7a3c'; rcText = `▼${Math.abs(rc)}`; }
+      ctx.fillStyle = rcColor;
+      ctx.font = `bold 12px "Noto Sans TC", sans-serif`;
+      ctx.fillText(rcText, 28, cy);
 
-    // streak badge (e.g. "3連買")
-    const consecLabel = consec >= 2 ? ` ${consec}連買` : '';
+      ctx.fillStyle = '#888';
+      ctx.font = '11px monospace';
+      ctx.fillText(s.code, 64, cy);
 
-    // stock code
-    ctx.fillStyle = '#888';
-    ctx.font = '11px monospace';
-    ctx.fillText(s.code, 64, cy);
-
-    // stock name + indicators
-    ctx.fillStyle = '#222';
-    ctx.font = `500 13px "Noto Sans TC", sans-serif`;
-    const nameLabel = (s.name_chi || s.name) + consecLabel;
-    ctx.fillText(nameLabel, 110, cy);
+      ctx.fillStyle = '#222';
+      ctx.font = `500 13px "Noto Sans TC", sans-serif`;
+      const consecLabel = consec >= 2 ? ` ${consec}連買` : '';
+      const nameLabel = (s.name_chi || s.name) + consecLabel;
+      ctx.fillText(nameLabel, 110, cy);
+    }
 
     // bar
     const bw = Math.abs(s.sb_net) / maxAbs * (chartW / 2) * 0.92;
@@ -915,10 +955,13 @@ function drawSbChart(sorted) {
 }
 
 function renderBshui() {
-  // Show all stocks sorted by sb_net; stocks not in top10 will have sb_net=0
+  // Only stocks with actual sb flow data (in the Stock Connect top-10/20)
+  // With real data.json: sb_net !== 0 for top-10 stocks only
+  // In demo mode: all mock stocks have random sb_net — cap at 20
   const sorted = [...allStocks].filter(s => s.sb_net !== 0).sort((a,b) => b.sb_net - a.sb_net);
-  // Fall back to all stocks if none have sb data (e.g. demo mode)
-  const display = sorted.length ? sorted : [...allStocks].sort((a,b) => (a.rank||99) - (b.rank||99));
+  const display = sorted.length
+    ? sorted.slice(0, 20)
+    : [...allStocks].sort((a,b) => (a.rank||99) - (b.rank||99)).slice(0, 15);
   const topBuy = display[0];
   const topSell = [...display].sort((a,b) => a.sb_net - b.sb_net)[0];
   const topConsec = [...display].sort((a,b) => (b.sb_consec||0) - (a.sb_consec||0))[0];
