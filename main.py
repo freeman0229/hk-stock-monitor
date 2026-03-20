@@ -8,9 +8,10 @@ from stock_ref import get_zh_name, get_industry, get_type, STOCKS
 from ccass_library import get_pct_history, get_sh_history, save_year, load_year
 from short_library import save_day as short_save_day, get_short_history, get_short_ratio_history
 from turnover_library import (save_day as tv_save_day, get_tv_history,
+                               get_vol_history,
                                load_recent as tv_load_recent, get_tv)
 
-from sc_top10_library import get_top10
+from sc_top10_library import get_top10, get_top10_history
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger(__name__)
@@ -366,48 +367,80 @@ def get_ccass_southbound(date: datetime = None) -> pd.DataFrame:
 
 
 def get_ccass_delta_and_avg(stock_codes: list, today_map: dict,
-                            today_ds: str, days: int = 25) -> pd.DataFrame:
+                            today_ds: str, days: int = 25,
+                            today_pct_map: dict = None) -> pd.DataFrame:
     """
-    Compute CCASS delta, avg, consec and pct averages for each stock.
-    Uses ccass_library year-split files as primary source (full 12-month history).
-    today_ds: ISO date string for today (YYYY-MM-DD) used as 'before' cutoff.
+    Compute CCASS metrics for each stock using pct_listed (% of issued shares)
+    as the primary signal — comparable across all stocks regardless of share count.
+
+    today_pct_map: {code: pct_listed} for today, from df_ccass.
+
+    Fields returned:
+      pct_listed   — today's % held in CCASS (from HKEX)
+      pct_delta    — today pct minus yesterday pct (percentage points)
+      pct_avg5     — avg pct_delta over last 5 days (direction + magnitude)
+      pct_avg20    — avg pct_listed over last 20 days (longer-term baseline)
+      ccass_consec — consecutive days pct moved in same direction as today
+                     (positive = accumulating streak, negative = distributing)
+      ccass_delta  — raw share count change (kept for internal signal thresholds)
     """
+    if today_pct_map is None:
+        today_pct_map = {}
     rows = []
     for code in stock_codes:
-        today_sh = today_map.get(code, 0)
+        today_sh  = today_map.get(code, 0)
+        pct_today = today_pct_map.get(code, 0.0)
 
-        # ── Shareholding history (delta + consec) ─────────────────────────────
-        sh_hist = get_sh_history(code, days, today_ds)   # newest-first
+        # ── pct history: newest-first, up to 25 days back ─────────────────────
+        pct_hist = get_pct_history(code, days, today_ds)   # [yesterday, day-2, ...]
 
-        prev_sh   = sh_hist[0] if sh_hist else 0
-        delta     = today_sh - prev_sh
-        direction = 1 if delta > 0 else (-1 if delta < 0 else 0)
+        pct_prev  = pct_hist[0] if pct_hist else 0.0
+        pct_delta = round(pct_today - pct_prev, 4) if pct_prev > 0 else 0.0
 
-        deltas = []
+        # pct_deltas between consecutive historical days (newest-first)
+        pct_deltas = [
+            round(pct_hist[i] - pct_hist[i + 1], 4)
+            for i in range(len(pct_hist) - 1)
+            if pct_hist[i] > 0 and pct_hist[i + 1] > 0
+        ]
+
+        # avg of last 5 daily pct changes (includes today's delta as most recent)
+        recent = ([pct_delta] + pct_deltas)[:5]
+        pct_avg5  = round(sum(recent) / len(recent), 4) if recent else None
+
+        # 20-day average pct_listed level (baseline)
+        pct_avg20 = round(sum(pct_hist[:20]) / len(pct_hist[:20]), 4) if len(pct_hist) >= 20 else None
+
+        # consecutive days pct moved in same direction as today
+        # flat days (delta == 0) are skipped — they don't break the streak
+        # also accumulate the total pct move over the streak
+        direction = 1 if pct_delta > 0 else (-1 if pct_delta < 0 else 0)
         consec = 0
-        for i in range(len(sh_hist) - 1):
-            day_d = sh_hist[i] - sh_hist[i + 1]
-            if sh_hist[i] > 0 or sh_hist[i + 1] > 0:
-                deltas.append(day_d)
-                if direction != 0 and consec == i:   # streak still alive
-                    if day_d * direction > 0:
-                        consec += direction
-                    else:
-                        direction = 0   # streak broken
+        streak_pct = pct_delta   # start with today's move
+        if direction != 0:
+            for d in pct_deltas:          # walk back from yesterday
+                if d == 0:
+                    continue              # flat day — skip, keep streak alive
+                if d * direction > 0:
+                    consec += direction   # same direction, extend streak
+                    streak_pct += d       # accumulate historical deltas
+                else:
+                    break                 # opposite direction, streak ends
 
-        # ── pct_listed history (北水 flow signals) ────────────────────────────
-        pct_vals = get_pct_history(code, 20, today_ds)   # newest-first
-
-        pct_avg5  = round(sum(pct_vals[:5])  / len(pct_vals[:5]),  4) if len(pct_vals) >= 5  else None
-        pct_avg20 = round(sum(pct_vals[:20]) / len(pct_vals[:20]), 4) if len(pct_vals) >= 20 else None
+        # raw share delta (still used by classify_insight thresholds)
+        sh_hist = get_sh_history(code, 2, today_ds)
+        prev_sh = sh_hist[0] if sh_hist else 0
+        delta   = today_sh - prev_sh
 
         rows.append({
-            "stock_code":   code,
-            "ccass_delta":  delta,
-            "ccass_avg5":   round(sum(deltas) / len(deltas), 0) if deltas else 0.0,
-            "ccass_consec": consec,
-            "pct_avg5":     pct_avg5,
-            "pct_avg20":    pct_avg20,
+            "stock_code":      code,
+            "ccass_delta":     delta,
+            "ccass_consec":    consec,
+            "ccass_streak_pct": round(streak_pct, 4),
+            "pct_listed":      pct_today,
+            "pct_delta":       pct_delta,
+            "pct_avg5":        pct_avg5,
+            "pct_avg20":       pct_avg20,
         })
     return pd.DataFrame(rows)
 
@@ -467,37 +500,35 @@ THRESHOLDS = {
 
 def classify_insight(code, stock_type, short_ratio, short_avg5, short_ratio_t2,
                      turnover, tv_avg5, turnover_t2,
-                     ccass_delta, ccass_avg5, ccass_consec,
-                     pct_avg5=None, pct_avg20=None) -> str:
+                     ccass_delta, ccass_consec,
+                     pct_delta=0.0,
+                     days_to_cover=0.0, vol_ratio=0.0,
+                     tv_ratio30=0.0, pct_dev30=0.0,
+                     sb_net=0) -> str:
     lo, hi, spike_warn, cover_drop = THRESHOLDS.get(stock_type, THRESHOLDS["general"])
     r_today = turnover / tv_avg5  if tv_avg5  > 0 else 1.0
     r_t2    = turnover_t2 / tv_avg5 if tv_avg5 > 0 else 1.0
     sc_t2   = (short_ratio_t2 - short_avg5) / short_avg5 if short_avg5 > 0 else 0.0
 
-    # ── 北水流入/流出 — 5-day vs 20-day pct_listed momentum ──────────────────
-    # Fires only when no stronger CCASS signal (機構增持) is present
-    pct_diff = round(pct_avg5 - pct_avg20, 4) if (pct_avg5 is not None and pct_avg20 is not None) else None
+    # ── 挾倉高危 — short squeeze danger ───────────────────────────────────────
+    if days_to_cover > 5 and vol_ratio > 2:                      return "🔥 挾倉高危"
 
-    # ── 機構增持 — sustained quiet accumulation ────────────────────────────────
-    # Conditions (all must be true):
-    #   1. CCASS rising 3+ consecutive settlement days (~6 trading days)
-    #   2. Short ratio at T-2 was stable (within ±20% of avg) — not a short squeeze
-    #   3. Today's CCASS still increasing
-    #   4. Volume at T-2 was not abnormally low (≥ 0.8× avg) — real activity
-    #   5. Today's delta meaningful (≥ 30% of recent avg, or avg is zero)
-    if (ccass_consec >= 3
-            and abs(sc_t2) <= 0.20
-            and ccass_delta > 0
-            and r_t2 >= 0.80
-            and (ccass_avg5 == 0 or ccass_delta >= ccass_avg5 * 0.30)): return "🏦 機構增持"
+    # ── 異常亢奮 — abnormal excitement ────────────────────────────────────────
+    if (vol_ratio  >  2.5
+            and tv_ratio30 >  2.0
+            and pct_dev30  >= 0.5):                               return "🐉 異常亢奮"
 
-    # ── 北水流入/流出 — fires after 機構增持 check ─────────────────────────────
-    if pct_diff is not None:
-        if pct_diff >= 0.3:   return "💧 北水流入"
-        if pct_diff <= -0.5:  return "🚨 北水流出"
+    # ── 北水增持 — quiet northbound accumulation ──────────────────────────────
+    if (1.8 <= vol_ratio  <= 2.5
+            and 1.5 <= tv_ratio30 <= 2.0
+            and 0.2 <= pct_dev30  <= 0.5):                        return "🏦 北水增持"
+
+    # ── 北水流出 — northbound net sell + CCASS decreasing ────────────────────
+    if sb_net < 0 and pct_delta < 0:                              return "🚨 北水流出"
+
     if short_ratio > hi + spike_warn:                             return "🚨 異常高沽空"
     if (short_avg5 > lo and short_ratio < short_avg5 * cover_drop
-            and r_today > 1.30):                                  return "⚠️ 空頭平倉信號"
+            and r_today > 1.30):                                  return "📉 空頭平倉"
     return None
 
 # ── Bootstrap ─────────────────────────────────────────────────────────────────
@@ -589,10 +620,13 @@ def run_analysis():
         df_ccass = get_ccass_southbound(prev_td)
 
     ccass_sh_map  = {}
+    ccass_pct_map = {}
     if not df_ccass.empty:
         ccass_sh_map  = dict(zip(df_ccass["stock_code"], df_ccass["shareholding"]))
-    
-    df_cs         = get_ccass_delta_and_avg(stock_codes, ccass_sh_map, today_ds)
+        ccass_pct_map = dict(zip(df_ccass["stock_code"], df_ccass["pct_listed"]))
+
+    df_cs         = get_ccass_delta_and_avg(stock_codes, ccass_sh_map, today_ds,
+                                            today_pct_map=ccass_pct_map)
     # Save today's CCASS into the year-split library
     if not df_ccass.empty:
         year = trading_day.year
@@ -603,11 +637,11 @@ def run_analysis():
         }
         save_year(year, lib)
         log.info("Saved CCASS to ccass_%d.json: %s (%d stocks)", year, today_ds, len(df_ccass))
-    ccass_delta_map  = dict(zip(df_cs["stock_code"], df_cs["ccass_delta"]))
-    ccass_avg5_map   = dict(zip(df_cs["stock_code"], df_cs["ccass_avg5"]))
-    ccass_consec_map = dict(zip(df_cs["stock_code"], df_cs["ccass_consec"]))
-    pct_avg5_map     = dict(zip(df_cs["stock_code"], df_cs["pct_avg5"]))
-    pct_avg20_map    = dict(zip(df_cs["stock_code"], df_cs["pct_avg20"]))
+    ccass_delta_map     = dict(zip(df_cs["stock_code"], df_cs["ccass_delta"]))
+    ccass_consec_map    = dict(zip(df_cs["stock_code"], df_cs["ccass_consec"]))
+    ccass_streak_pct_map= dict(zip(df_cs["stock_code"], df_cs["ccass_streak_pct"]))
+    pct_listed_map      = dict(zip(df_cs["stock_code"], df_cs["pct_listed"]))
+    pct_delta_map       = dict(zip(df_cs["stock_code"], df_cs["pct_delta"]))
 
     # 5. Southbound top10 (from sc_top10_library)
     sb_map = {}   # code -> {buy, sell, net} in HKD
@@ -619,6 +653,33 @@ def run_analysis():
         }
     log.info("Southbound top10: %d stocks for %s", len(sb_map), today_ds)
 
+    # 5a. Compute sb_consec and sb_net_prev for each stock in sb_map
+    # Logic: look back through top10 history; count consecutive days with net > 0
+    # (buy > sell). A day the stock is absent = fell off table = streak reset.
+    # Also grab previous day's net for ranking-change comparison.
+    def _sb_consec_and_prev(code: str) -> tuple[int, int]:
+        """Returns (consecutive_net_buy_days, prev_day_net_flow)."""
+        history = get_top10_history(code, 30, today_ds)
+        # history is reverse-chrono: [yesterday, day-before, ...]
+        if not history:
+            return 0, 0
+        prev_net = history[0]["buy"] - history[0]["sell"]
+        consec = 0
+        for entry in history:
+            net = entry["buy"] - entry["sell"]
+            if net > 0:
+                consec += 1
+            else:
+                break   # net sell or zero = streak ends
+        return consec, prev_net
+
+    sb_consec_map  = {}
+    sb_prev_map    = {}
+    for code in sb_map:
+        consec, prev = _sb_consec_and_prev(code)
+        sb_consec_map[code] = consec
+        sb_prev_map[code]   = prev
+
     # 6. Previous ranks
     prev_ranks = get_prev_ranks(exclude_date=trading_day)
 
@@ -628,12 +689,31 @@ def run_analysis():
         code         = row.stock_code
         short_ratio  = short_map.get(code, 0.0)
         short_avg5   = short_avg_map.get(code, 0.0)
-        ccass_delta  = ccass_delta_map.get(code, 0)
-        ccass_avg5   = ccass_avg5_map.get(code, 0.0)
-        ccass_consec = ccass_consec_map.get(code, 0)
-        pct_avg5     = pct_avg5_map.get(code)
-        pct_avg20    = pct_avg20_map.get(code)
-        tv_avg5      = _turnover_avg(code, today_ds, 5)
+        ccass_delta      = ccass_delta_map.get(code, 0)
+        ccass_consec     = ccass_consec_map.get(code, 0)
+        ccass_streak_pct = ccass_streak_pct_map.get(code, 0.0)
+        pct_listed       = pct_listed_map.get(code, 0.0)
+        pct_delta        = pct_delta_map.get(code, 0.0)
+        tv_avg5          = _turnover_avg(code, today_ds, 5)
+
+        # ── 挾倉高危: short volume vs avg 30-day share volume ──────────────────
+        short_vol_today = df_short[df_short["stock_code"] == code]["short_volume"].sum() \
+                          if not df_short.empty else 0
+        vol_hist30      = get_vol_history(code, 30, today_ds)
+        avg_vol30       = sum(vol_hist30) / len(vol_hist30) if vol_hist30 else 0
+        today_vol       = int(row.shares)
+        days_to_cover   = round(short_vol_today / avg_vol30, 2) if avg_vol30 > 0 else 0.0
+        vol_ratio       = round(today_vol / avg_vol30, 2)       if avg_vol30 > 0 else 0.0
+
+        # ── 30-day averages for 機構增持 ────────────────────────────────────────
+        tv_hist30  = get_tv_history(code, 30, today_ds)
+        tv_avg30   = sum(tv_hist30) / len(tv_hist30) if tv_hist30 else 0.0
+        tv_ratio30 = round(float(row.turnover) / tv_avg30, 2) if tv_avg30 > 0 else 0.0
+        # pct_avg30: 30-day average pct_listed level (not delta)
+        pct_hist30 = get_pct_history(code, 30, today_ds)
+        pct_avg30_lvl = round(sum(pct_hist30) / len(pct_hist30), 4) if pct_hist30 else 0.0
+        # deviation of today's pct from 30-day avg (percentage points)
+        pct_dev30  = round(pct_listed - pct_avg30_lvl, 4) if pct_avg30_lvl > 0 else 0.0
 
         tv_t2_raw      = _value_at_tv(code, t2_key)
         _t2_short      = get_short_history(code, 1, t2_date.strftime("%Y-%m-%d") + "z")
@@ -643,31 +723,44 @@ def run_analysis():
 
         stock_type       = classify_stock(code, row.name)
         _, ind_zh        = get_industry(code)
-        insight             = classify_insight(
+
+        sb           = sb_map.get(code, {})   # must be before classify_insight
+        insight = classify_insight(
             code, stock_type, short_ratio, short_avg5, short_ratio_t2,
             int(row.turnover), tv_avg5, turnover_t2,
-            int(ccass_delta), float(ccass_avg5), int(ccass_consec),
-            pct_avg5, pct_avg20
+            int(ccass_delta), int(ccass_consec),
+            pct_delta=pct_delta,
+            days_to_cover=days_to_cover, vol_ratio=vol_ratio,
+            tv_ratio30=tv_ratio30, pct_dev30=pct_dev30,
+            sb_net=sb.get("sb_net", 0)
         )
 
         prev_rank   = prev_ranks.get(code)
         rank_new    = prev_rank is None
         rank_change = 0 if rank_new else prev_rank - i
-
-        sb           = sb_map.get(code, {})
         results.append({
             "rank": i, "rank_change": rank_change, "rank_new": rank_new,
             "code": code, "name": row.name, "name_chi": getattr(row, "name_chi", row.name),
             "stock_type": stock_type, "industry_zh": ind_zh,
             "turnover": int(row.turnover),
-            "sb_buy":  sb.get("sb_buy",  0),
-            "sb_sell": sb.get("sb_sell", 0),
-            "sb_net":  sb.get("sb_net",  0),
+            "sb_buy":      sb.get("sb_buy",  0),
+            "sb_sell":     sb.get("sb_sell", 0),
+            "sb_net":      sb.get("sb_net",  0),
+            "sb_net_prev": int(sb_prev_map.get(code, 0)),
+            "sb_consec":   int(sb_consec_map.get(code, 0)),
             "short_ratio": round(short_ratio, 2), "short_avg5": round(short_avg5, 2),
             "short_ratio_t2": round(short_ratio_t2, 2),
+            "short_vol":      int(short_vol_today),
+            "days_to_cover":  days_to_cover,
+            "vol_ratio":      vol_ratio,
+            "tv_ratio30":     tv_ratio30,
+            "pct_dev30":      round(pct_dev30, 4),
             "ccass_trade_date": t2_date.strftime("%Y-%m-%d"),
-            "ccass_delta": int(ccass_delta),
-            "ccass_avg5": int(ccass_avg5), "ccass_consec": int(ccass_consec),
+            "ccass_delta":       int(ccass_delta),
+            "ccass_consec":      int(ccass_consec),
+            "ccass_streak_pct":  round(ccass_streak_pct, 4),
+            "pct_listed": round(pct_listed, 4),
+            "pct_delta":  round(pct_delta,  4),
             "insight": insight,
         })
 
@@ -700,7 +793,7 @@ def run_analysis():
             lines.append("─────────────")
             for s in flagged[:5]:
                 rc = f" [↑{s['rank_change']}]" if s['rank_change'] > 0 else (" [new]" if s['rank_new'] else "")
-                lines.append(f"{s['insight']} {s['name_chi']}({s['code']}){rc} | 沽空率 {s['short_ratio']}% | CCASS Δ {s['ccass_delta']:,}")
+                lines.append(f"{s['insight']} {s['name_chi']}({s['code']}){rc} | 沽空率 {s['short_ratio']}% | CCASS {'+' if s['pct_delta']>=0 else ''}{s['pct_delta']}pp")
         send_telegram("\n".join(lines))
 
 

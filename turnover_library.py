@@ -143,6 +143,31 @@ def get_tv(code: str, ds_yyyymmdd: str) -> float:
     return float(rec)
 
 
+def get_vol_history(code: str, n: int, before: str) -> list:
+    """
+    Return last n share volume values for a stock before date `before`
+    (YYYY-MM-DD), newest-first. Skips days with no data.
+    """
+    code5  = code.zfill(5)
+    result = []
+    for year in sorted(all_years(), reverse=True):
+        p = lib_path(year)
+        if not os.path.exists(p):
+            continue
+        with open(p, encoding="utf-8") as f:
+            by_date = json.load(f).get("by_date", {})
+        for ds in sorted(by_date.keys(), reverse=True):
+            if ds >= before:
+                continue
+            rec = by_date[ds].get(code5, {})
+            vol = rec.get("vol", 0) if isinstance(rec, dict) else 0
+            if vol > 0:
+                result.append(int(vol))
+            if len(result) >= n:
+                return result
+    return result
+
+
 def get_tv_history(code: str, n: int, before: str) -> list:
     """
     Return last n turnover values (HKD) for a stock before date `before`
