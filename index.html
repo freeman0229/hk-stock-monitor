@@ -871,8 +871,7 @@ function drawSbChart(sorted) {
   const stocks = sorted.slice(0, maxStocks);
   if (!stocks.length) return;
 
-  const panel = document.getElementById('panel-bshui');
-  const W = Math.max(300, (panel ? panel.offsetWidth : window.innerWidth) - 20);
+  const W = Math.max(300, window.innerWidth - 48);
   const H = PAD_TOP + stocks.length * ROW_H + PAD_BOT;
 
   canvas.width  = W;
@@ -884,6 +883,7 @@ function drawSbChart(sorted) {
 
   const chartW = W - PAD_LEFT - PAD_RIGHT;
   const maxAbs = Math.max(...stocks.map(s => Math.abs(s.sb_net)), 1);
+  console.log(`[chart] W=${W} chartW=${chartW} stocks=${stocks.length} maxAbs=${maxAbs} layout=${layout}`);
 
   // zero line x
   const zeroX = PAD_LEFT + chartW / 2;
