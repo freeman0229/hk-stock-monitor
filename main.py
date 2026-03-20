@@ -213,8 +213,8 @@ def get_daily_quotation(date: datetime = None) -> pd.DataFrame:
             if not m:
                 continue
             code_int = int(m.group(1))
-            if code_int > 99999:
-                continue   # regex caps at 5 digits, so this only skips truly malformed rows
+            if code_int > 9999:
+                continue   # skip warrants (10000+), CBBCs (50000+), structured products
             code     = str(code_int).zfill(5)
             name_eng = m.group(2).strip()
             name_chi = re.sub(r'[\u3000\uff20\uff64\s]+$', '', m.group(3)).strip()
@@ -621,26 +621,15 @@ def run_analysis():
     pct_delta_map       = dict(zip(df_cs["stock_code"], df_cs["pct_delta"]))
 
     # 5. Southbound top10 (from sc_top10_library)
-    sb_map = {}   # code -> {buy, sell, net, rank, total} in HKD
-    for s in get_top10(today_ds):
-        sb_map[s["code"]] = {
-            "sb_buy":    s["buy"],
-            "sb_sell":   s["sell"],
-            "sb_net":    s["buy"] - s["sell"],
-            "sb_rank":   s.get("rank", 0),
-            "sb_total":  s.get("total", 0),
-            "sb_rank_sse":  s.get("rank_sse"),
-            "sb_rank_szse": s.get("rank_szse"),
-        }
-    log.info("Southbound top10: %d stocks for %s", len(sb_map), today_ds)
+    # Try library first; if today not stored yet, do a live fetch directly from HKEX.
+    # HKEX publishes SC data same-day (usually by 18:00–20:00 HKT).
+    from sc_top10_library import fetch_day as sc_fetch_day, save_year as sc_save_year, load_year as sc_load_year, lib_path as sc_lib_path
+    from datetime import date as _date
 
-    # If today's data not yet published, fall back to the most recent available day
-    sb_date_used = today_ds
-    if not sb_map:
-        prev_td = last_trading_day(trading_day - timedelta(days=1))
-        prev_ds = prev_td.strftime("%Y-%m-%d")
-        for s in get_top10(prev_ds):
-            sb_map[s["code"]] = {
+    def _build_sb_map(top10_list: list) -> dict:
+        m = {}
+        for s in top10_list:
+            m[s["code"]] = {
                 "sb_buy":    s["buy"],
                 "sb_sell":   s["sell"],
                 "sb_net":    s["buy"] - s["sell"],
@@ -649,11 +638,40 @@ def run_analysis():
                 "sb_rank_sse":  s.get("rank_sse"),
                 "sb_rank_szse": s.get("rank_szse"),
             }
+        return m
+
+    sb_map = {}   # code -> {buy, sell, net, rank, total} in HKD
+    sb_date_used = today_ds
+
+    # 1. Try library (already stored from previous run or --reparse)
+    sb_map = _build_sb_map(get_top10(today_ds))
+
+    # 2. If not in library, try live fetch from HKEX and store immediately
+    if not sb_map:
+        log.info("Southbound top10: not in library for %s — attempting live fetch", today_ds)
+        live_rec = sc_fetch_day(trading_day.date() if hasattr(trading_day, 'date') else _date.fromisoformat(today_ds))
+        if live_rec and len(live_rec.get("top10", [])) >= 1:
+            year = trading_day.year
+            lib  = sc_load_year(year)
+            lib["by_date"][today_ds] = live_rec
+            sc_save_year(year, lib)
+            sb_map = _build_sb_map(live_rec.get("top10", []))
+            log.info("Southbound top10: live fetch succeeded — %d stocks for %s", len(sb_map), today_ds)
+        else:
+            log.info("Southbound top10: live fetch returned no data for %s", today_ds)
+
+    # 3. Fall back to most recent available day if still empty
+    if not sb_map:
+        prev_td = last_trading_day(trading_day - timedelta(days=1))
+        prev_ds = prev_td.strftime("%Y-%m-%d")
+        sb_map  = _build_sb_map(get_top10(prev_ds))
         if sb_map:
             sb_date_used = prev_ds
             log.info("Southbound top10: using previous day %s (%d stocks)", prev_ds, len(sb_map))
         else:
             log.warning("Southbound top10: no data for today or yesterday")
+
+    log.info("Southbound top10: %d stocks for %s", len(sb_map), sb_date_used)
 
     # 5a. Compute sb_consec and sb_net_prev for each stock in sb_map
     # Logic: look back through top10 history; count consecutive days with net > 0
@@ -751,13 +769,18 @@ def run_analysis():
         _, ind_zh        = get_industry(code)
 
         sb           = sb_map.get(code, {})   # must be before classify_insight
+        # Suppress ratio-based signals if history is too thin (< 5 days) to avoid
+        # false positives on new stocks where 1-2 day averages are not meaningful
+        has_history  = len(tv_hist30) >= 5 and len(vol_hist30) >= 5
         insight = classify_insight(
             code, stock_type, short_ratio, short_avg5, short_ratio_t2,
             int(row.turnover), tv_avg5, turnover_t2,
             int(ccass_delta), int(ccass_consec),
             pct_delta=pct_delta,
-            days_to_cover=days_to_cover, vol_ratio=vol_ratio,
-            tv_ratio30=tv_ratio30, pct_dev30=pct_dev30,
+            days_to_cover=days_to_cover if has_history else 0.0,
+            vol_ratio=vol_ratio         if has_history else 0.0,
+            tv_ratio30=tv_ratio30       if has_history else 0.0,
+            pct_dev30=pct_dev30         if has_history else 0.0,
             sb_net=sb.get("sb_net", 0)
         )
 
