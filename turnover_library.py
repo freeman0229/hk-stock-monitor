@@ -1,8 +1,8 @@
 """
 turnover_library.py — HKEX Daily Turnover & Volume Library
 ===========================================================
-Stores daily turnover (HKD) and volume (shares) for the top 100
-stocks by turnover from the HKEX daily quotation file.
+Stores daily turnover (HKD) and volume (shares) for all stocks
+from the HKEX daily quotation file.
 
 Library files: turnover_{YYYY}.json — one per year
 

@@ -554,7 +554,7 @@ tbody td { padding: 9px 12px; vertical-align: middle; }
     <div class="sum-card"><div class="sum-label">CCASS增持最多</div><div class="sum-val up" id="cc-top-name">--</div><div class="sum-sub" id="cc-top-delta">--</div></div>
     <div class="sum-card"><div class="sum-label">CCASS減持最多</div><div class="sum-val dn" id="cc-bot-name">--</div><div class="sum-sub" id="cc-bot-delta">--</div></div>
     <div class="sum-card"><div class="sum-label">連續增持 ≥5日</div><div class="sum-val gold" id="cc-consec-cnt">--</div><div class="sum-sub">股票數</div></div>
-    <div class="sum-card"><div class="sum-label">5日均值持倉最高</div><div class="sum-val" id="cc-avg-name">--</div><div class="sum-sub" id="cc-avg-val">--</div></div>
+    <div class="sum-card"><div class="sum-label">連續持倉最長</div><div class="sum-val" id="cc-avg-name">--</div><div class="sum-sub" id="cc-avg-val">--</div></div>
   </div>
 
   <div class="sec-head">
@@ -1022,18 +1022,9 @@ function drawSbChart(sorted) {
 function renderBshui() {
   // Only stocks with SB flow today — sorted by overall market turnover high→low.
   // This answers: "of the stocks mainland money touched, which were biggest by tape?"
-  // Sort: stocks with quotation data by overall turnover desc.
-  // SB-orphan stocks (turnover=0, not in daily quotation) sort by sb_total desc
-  // so they still appear near top alongside other active SB stocks.
   const sorted = [...allStocks]
     .filter(s => s.sb_buy > 0 || s.sb_sell > 0 || s.sb_total > 0)
-    .sort((a, b) => {
-      const ta = a.turnover || 0, tb = b.turnover || 0;
-      if (ta === 0 && tb === 0) return (b.sb_total || 0) - (a.sb_total || 0);
-      if (ta === 0) return 1;   // orphans after quoted stocks
-      if (tb === 0) return -1;
-      return tb - ta;
-    });
+    .sort((a, b) => (b.turnover || 0) - (a.turnover || 0));
   console.log(`[bshui] allStocks=${allStocks.length} sb_active=${sorted.length}`);
   const display = sorted;
   const countEl = document.getElementById('sb-stock-count');

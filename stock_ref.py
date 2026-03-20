@@ -69,6 +69,7 @@ STOCKS: dict[str, dict] = {
     # ── 科技平台 ─────────────────────────────────────────────────────────────
     "00700": {"en":"TENCENT",               "zh":"騰訊控股",          "industry":"TEC","ind_zh":"科技",     "type":"bluechip"},
     "09988": {"en":"BABA-W",                "zh":"阿里巴巴",          "industry":"TEC","ind_zh":"科技",     "type":"bluechip"},
+    "00981": {"en":"SMIC",                   "zh":"中芯國際",          "industry":"TEC","ind_zh":"科技",     "type":"general"},
     "01810": {"en":"XIAOMI-W",              "zh":"小米集團",          "industry":"TEC","ind_zh":"科技",     "type":"bluechip"},
     "09618": {"en":"JD-SW",                 "zh":"京東集團",          "industry":"TEC","ind_zh":"科技",     "type":"bluechip"},
     "09888": {"en":"BAIDU-SW",              "zh":"百度集團",          "industry":"TEC","ind_zh":"科技",     "type":"bluechip"},
@@ -131,6 +132,7 @@ STOCKS: dict[str, dict] = {
     "00013": {"en":"HUTCHMED",              "zh":"和黃醫藥",          "industry":"HCR","ind_zh":"醫療",     "type":"general"},
 
     # ── 工業 ─────────────────────────────────────────────────────────────────
+    "06869": {"en":"FABRINET HK",             "zh":"長飛光纖光纜",       "industry":"IND","ind_zh":"工業",     "type":"general"},
     "00390": {"en":"CHINA RAILWAY",         "zh":"中國中鐵",          "industry":"IND","ind_zh":"工業",     "type":"stable"},
     "01186": {"en":"CR CONSTRUCTION",       "zh":"中國鐵建",          "industry":"IND","ind_zh":"工業",     "type":"stable"},
     "00187": {"en":"JINGCHENG MAC",         "zh":"景成機械",          "industry":"IND","ind_zh":"工業",     "type":"general"},
@@ -138,6 +140,7 @@ STOCKS: dict[str, dict] = {
     "06690": {"en":"HAIER SMART HOME",      "zh":"海爾智家",          "industry":"IND","ind_zh":"工業",     "type":"general"},
     "00568": {"en":"SHANDONG MOLONG",       "zh":"山東墨龍",          "industry":"IND","ind_zh":"工業",     "type":"general"},
 
+    "02899": {"en":"CHALCO",                  "zh":"中國鋁業",           "industry":"MET","ind_zh":"金屬礦產", "type":"stable"},
     # ── 金屬礦產 ─────────────────────────────────────────────────────────────
     "01088": {"en":"CHINA SHENHUA",         "zh":"中國神華",          "industry":"MET","ind_zh":"金屬礦產", "type":"stable"},
     "00358": {"en":"JIANGXI COPPER",        "zh":"江西銅業股份",      "industry":"MET","ind_zh":"金屬礦產", "type":"general"},

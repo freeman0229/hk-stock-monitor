@@ -138,7 +138,7 @@ def save_day(d, records: dict):
 def fetch_ccass(d: date) -> dict | None:
     """
     Fetch all HK southbound CCASS holdings for date d.
-    Uses GET + txtShareholdingDate param — no viewstate needed.
+    Uses GET + POST with ASP.NET viewstate for date selection.
     Returns {stock_code: {"sh": int, "pct": float}} or None.
     """
     date_str = d.strftime("%Y/%m/%d")

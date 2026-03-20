@@ -213,8 +213,8 @@ def get_daily_quotation(date: datetime = None) -> pd.DataFrame:
             if not m:
                 continue
             code_int = int(m.group(1))
-            if code_int > 9999:
-                continue
+            if code_int > 99999:
+                continue   # regex caps at 5 digits, so this only skips truly malformed rows
             code     = str(code_int).zfill(5)
             name_eng = m.group(2).strip()
             name_chi = re.sub(r'[\u3000\uff20\uff64\s]+$', '', m.group(3)).strip()
@@ -587,7 +587,7 @@ def run_analysis():
     # 3. Short avg
     _tv_recent    = tv_load_recent(15, today_ds)
     _sa_df        = get_short_avg_ratio(stock_codes, 10, _tv_recent, today_ds)
-    short_avg_map = dict(zip(_sa_df["stock_code"], _sa_df["short_ratio_avg5"]))
+    short_avg_map = dict(zip(_sa_df["stock_code"], _sa_df["short_ratio_avg5"]))  # avg over 10 days despite "avg5" name in library
 
     # T-2: the actual trade date that today's CCASS settlement reflects
     # Uses joint HK+CN calendar so long holidays are correctly handled
@@ -673,10 +673,20 @@ def run_analysis():
         prev_net = (history[0]["buy"] - history[0]["sell"]) if history else 0
 
         today_net = sb_map[code]["sb_net"]   # today is always in sb_map here
-        if today_net <= 0:
-            # today is net-sell or zero — streak is 0 (or negative for sell)
-            consec = -1 if today_net < 0 else 0
+        if today_net < 0:
+            # today is net-sell — count how many consecutive sell days
+            consec = -1
+            for entry in history:
+                net = entry["buy"] - entry["sell"]
+                if net < 0:
+                    consec -= 1
+                elif net == 0:
+                    continue
+                else:
+                    break
             return consec, prev_net
+        if today_net == 0:
+            return 0, prev_net
 
         # today is net-buy → start streak at 1, extend with prior net-buy days
         consec = 1
