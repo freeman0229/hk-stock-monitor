@@ -465,13 +465,14 @@ tbody td { padding: 9px 12px; vertical-align: middle; }
   <div class="summary-bar" id="sb-summary">
     <div class="sum-card"><div class="sum-label">今日北水淨買入 Top</div><div class="sum-val up" id="sb-top-buy">--</div><div class="sum-sub" id="sb-top-buy-name">--</div></div>
     <div class="sum-card"><div class="sum-label">今日北水淨賣出 Top</div><div class="sum-val dn" id="sb-top-sell">--</div><div class="sum-sub" id="sb-top-sell-name">--</div></div>
+    <div class="sum-card"><div class="sum-label">北水最高佔比</div><div class="sum-val gold" id="sb-top-pct">--</div><div class="sum-sub" id="sb-top-pct-name">--</div></div>
     <div class="sum-card"><div class="sum-label">北水持續淨買入</div><div class="sum-val gold" id="sb-consec">--</div><div class="sum-sub" id="sb-consec-name">--</div></div>
   </div>
 
   <!-- Chart -->
   <div class="sec-head">
     <div class="sec-title">北水淨流入 — 綜合對比</div>
-    <div class="sec-sub" id="sb-date-label">按淨流入額排序 ｜ 數據來源：CCASS</div>
+    <div class="sec-sub" id="sb-date-label">按總成交額排序 ｜ 北水佔比 = 北水總成交 ÷ 全市場成交</div>
   </div>
   <div style="background:var(--card);border:1px solid var(--border);border-radius:6px;padding:16px 12px 12px;margin-bottom:16px;overflow:visible;">
     <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px;font-size:12px;color:var(--muted);">
@@ -498,17 +499,18 @@ tbody td { padding: 9px 12px; vertical-align: middle; }
         <tr>
           <th class="rank">#</th>
           <th>股票</th>
-          <th class="num-r" data-col="sb_net">淨流入</th>
-          <th class="num-r mob-hide" data-col="sb_buy">買入</th>
-          <th class="num-r mob-hide" data-col="sb_sell">賣出</th>
-          <th class="num-r mob-hide" data-col="short_ratio">沽空%</th>
-          <th class="num-r mob-hide" data-col="ccass_delta">CCASS變動%</th>
+          <th class="num-r" data-col="turnover">總成交額</th>
+          <th class="num-r" data-col="sb_pct">北水佔比</th>
+          <th class="num-r mob-hide" data-col="sb_net">北水淨流入</th>
+          <th class="num-r mob-hide" data-col="sb_buy">北水買入</th>
+          <th class="num-r mob-hide" data-col="sb_sell">北水賣出</th>
+          <th class="num-r mob-hide" data-col="sb_rank_sse">SSE/SZ</th>
           <th class="num-r mob-hide" data-col="ccass_consec">連續日數</th>
           <th data-col="insight">信號</th>
         </tr>
       </thead>
       <tbody id="body-bshui">
-        <tr><td colspan="9"><div class="loading-box"><div class="spinner"></div>載入中…</div></td></tr>
+        <tr><td colspan="10"><div class="loading-box"><div class="spinner"></div>載入中…</div></td></tr>
       </tbody>
     </table>
   </div>
@@ -810,14 +812,24 @@ function generateMockData() {
     const cd  = Math.round((Math.random()-0.4)*5e6);
     const cc  = Math.round(Math.random()*8)-2;
     const insightPool = ['🔥 挾倉高危', '🐉 異常亢奮', '🏦 北水增持', '🚨 北水流出', '🚨 異常高沽空', '📉 空頭平倉', '', '', ''];
+    // Mock exchange ranks: dual-listed stocks (i < 8) appear on both; last 2 are single-exchange
+    const mockSbBuy  = sbn > 0 ? Math.round(sbn * 1.2) : 0;
+    const mockSbSell = sbn > 0 ? Math.round(sbn * 0.8) : 0;
+    const mockTotal  = mockSbBuy + mockSbSell;
+    // sb_pct: realistic 5–60% participation for demo stocks; zero for non-SB stocks
+    const mockSbPct  = i < SB_TOP ? (10 + Math.random() * 50) : 0;
+    const dualListed = i < 8;
     return {
       rank: i+1, rank_new: Math.random()>0.85, rank_change: Math.round((Math.random()-0.5)*10),
       ...s, turnover: tv,
       short_ratio: sr, short_avg5: sa, short_ratio_t2: sr+(Math.random()-0.5)*2,
-      sb_buy: sbn > 0 ? sbn*1.2 : 0, sb_sell: sbn > 0 ? sbn*0.8 : 0, sb_net: sbn,
+      sb_buy: mockSbBuy, sb_sell: mockSbSell, sb_net: sbn,
+      // sb_total derived from turnover * sbPct so the participation bar is realistic
+      sb_total: i < SB_TOP ? Math.round(tv * mockSbPct / 100) : 0,
+      sb_rank_sse:  i < SB_TOP ? (dualListed ? (i + 1) : null) : null,
+      sb_rank_szse: i < SB_TOP ? (dualListed ? (i + 1) : (i - 7)) : null,
       ccass_delta: cd, ccass_consec: cc,
       ccass_streak_pct: parseFloat((cc * (Math.random()*0.08 + 0.03) * (cc >= 0 ? 1 : -1)).toFixed(4)),
-
       pct_listed: 5 + Math.random() * 20,
       pct_delta: parseFloat(((Math.random() - 0.5) * 0.5).toFixed(4)),
       sb_consec: Math.floor(Math.random()*6),
@@ -986,10 +998,12 @@ function drawSbChart(sorted) {
 }
 
 function renderBshui() {
-  // All southbound stocks ordered by rank (best rank across SSE/SZSE) — no filters
+  // Pipeline: read all stocks with any SB flow → join overall turnover → sort by
+  // overall market turnover high→low. This shows the big picture: which of today's
+  // most-traded stocks had mainland money in them, and how much of the tape was SB.
   const sorted = [...allStocks]
     .filter(s => s.sb_buy > 0 || s.sb_sell > 0 || s.sb_total > 0)
-    .sort((a, b) => (a.sb_rank || 999) - (b.sb_rank || 999) || b.sb_total - a.sb_total);
+    .sort((a, b) => (b.turnover || 0) - (a.turnover || 0));
   console.log(`[bshui] allStocks=${allStocks.length} sb_active=${sorted.length}`);
   const display = sorted;
 
@@ -1002,7 +1016,7 @@ function renderBshui() {
     document.getElementById('sb-consec').textContent = '';
     document.getElementById('sb-consec-name').textContent = '';
     document.getElementById('body-bshui').innerHTML =
-      '<tr><td colspan="8"><div class="loading-box" style="padding:30px">📡 北水數據尚未發布，通常於每交易日 20:00 HKT 後更新</div></td></tr>';
+      '<tr><td colspan="10"><div class="loading-box" style="padding:30px">📡 北水數據尚未發布，通常於每交易日 20:00 HKT 後更新</div></td></tr>';
     // Keep last cached chart visible if available
     if (lastChartData.length) setTimeout(() => drawSbChart(lastChartData), 50);
     return;
@@ -1018,14 +1032,24 @@ function renderBshui() {
     }
   }
 
-  const topBuy = display[0];
-  const topSell = [...display].sort((a,b) => a.sb_net - b.sb_net)[0];
+  const topBuy    = [...display].sort((a,b) => b.sb_net - a.sb_net)[0];
+  const topSell   = [...display].sort((a,b) => a.sb_net - b.sb_net)[0];
+  const topPct    = [...display].sort((a,b) => {
+    const pa = a.turnover > 0 ? a.sb_total / a.turnover : 0;
+    const pb = b.turnover > 0 ? b.sb_total / b.turnover : 0;
+    return pb - pa;
+  })[0];
   const topConsec = [...display].sort((a,b) => (b.sb_consec||0) - (a.sb_consec||0))[0];
 
   document.getElementById('sb-top-buy').textContent = topBuy ? fmtM(topBuy.sb_net) : '--';
   document.getElementById('sb-top-buy-name').textContent = topBuy ? topBuy.name_chi : '--';
   document.getElementById('sb-top-sell').textContent = topSell ? fmtM(topSell.sb_net) : '--';
   document.getElementById('sb-top-sell-name').textContent = topSell ? topSell.name_chi : '--';
+  if (document.getElementById('sb-top-pct')) {
+    const topPctVal = topPct && topPct.turnover > 0 ? (topPct.sb_total / topPct.turnover * 100) : 0;
+    document.getElementById('sb-top-pct').textContent = topPct ? topPctVal.toFixed(1) + '%' : '--';
+    document.getElementById('sb-top-pct-name').textContent = topPct ? topPct.name_chi : '--';
+  }
   const topConsecVal = topConsec ? (topConsec.sb_consec || 0) : 0;
   document.getElementById('sb-consec').textContent = topConsecVal >= 2 ? topConsecVal + '日' : '';
   document.getElementById('sb-consec-name').textContent = topConsecVal >= 2 ? topConsec.name_chi : '';
@@ -1051,23 +1075,46 @@ function renderBshui() {
   // Defer draw — give browser time to lay out the panel fully
   setTimeout(() => drawSbChart(chartData), 50);
 
+  // SB participation colour scale: <10% grey, 10–25% amber, 25–50% orange, >50% red
+  function sbPctColor(pct) {
+    if (pct >= 50) return '#c0252d';
+    if (pct >= 25) return '#e07020';
+    if (pct >= 10) return '#b8860b';
+    return 'var(--muted)';
+  }
+  function sbParticipationBar(pct) {
+    const w = Math.min(52, Math.round(pct / 100 * 52));
+    const col = sbPctColor(pct);
+    return `<div style="display:inline-flex;align-items:center;gap:5px">` +
+      `<div style="width:52px;height:5px;background:var(--border);border-radius:3px;overflow:hidden">` +
+        `<div style="width:${w}px;height:100%;background:${col};border-radius:3px"></div>` +
+      `</div>` +
+      `<span style="color:${col};font-size:11px;font-weight:600;min-width:34px">${pct.toFixed(1)}%</span>` +
+    `</div>`;
+  }
+
   // Build table rows
   const html = display.map((s,i) => {
     const netClass = s.sb_net > 0 ? 'up-txt' : 'dn-txt';
-    const srClass  = s.short_ratio > s.short_avg5 ? 'up-txt' : '';
+    const sbPct    = s.turnover > 0 ? (s.sb_total / s.turnover * 100) : 0;
+    // SSE/SZ rank badges
+    const rSSE  = s.sb_rank_sse  != null ? `<span style="font-size:10px;color:var(--muted)">滬#${s.sb_rank_sse}</span>`  : '';
+    const rSZSE = s.sb_rank_szse != null ? `<span style="font-size:10px;color:var(--muted)">深#${s.sb_rank_szse}</span>` : '';
+    const rankBadges = [rSSE, rSZSE].filter(Boolean).join(' ') || '—';
     return `<tr>
       <td class="rank">${i+1}</td>
       <td><span class="name-cell">${s.name_chi}</span><span class="name-zh">${s.code}</span></td>
-      <td class="num-r ${netClass}">${sign(s.sb_net)}${fmtM(s.sb_net)}</td>
+      <td class="num-r">${fmtM(s.turnover)}</td>
+      <td class="num-r">${sbParticipationBar(sbPct)}</td>
+      <td class="num-r mob-hide ${netClass}">${sign(s.sb_net)}${fmtM(s.sb_net)}</td>
       <td class="num-r mob-hide">${fmtM(s.sb_buy)}</td>
       <td class="num-r mob-hide">${fmtM(s.sb_sell)}</td>
-      <td class="num-r mob-hide ${srClass}">${s.short_ratio != null ? fmtPct(s.short_ratio) : '—'}</td>
-      <td class="num-r mob-hide ${s.ccass_delta>0?'up-txt':s.ccass_delta<0?'dn-txt':''}">${s.pct_delta != null && s.pct_delta !== 0 ? (s.pct_delta > 0 ? '+' : '') + s.pct_delta.toFixed(2) + '%' : '—'}</td>
+      <td class="num-r mob-hide" style="white-space:nowrap;line-height:1.6">${rankBadges}</td>
       <td class="num-r mob-hide ${s.ccass_consec>0?'up-txt':s.ccass_consec<0?'dn-txt':''}">${fmtConsec(s)}</td>
       <td>${insightBadge(s.insight)}</td>
     </tr>`;
   }).join('');
-  document.getElementById('body-bshui').innerHTML = html || '<tr><td colspan="9" class="loading-box">無北水數據</td></tr>';
+  document.getElementById('body-bshui').innerHTML = html || '<tr><td colspan="10" class="loading-box">無北水數據</td></tr>';
 
   // Update ticker
   const sbNet = display.reduce((a,s) => a+s.sb_net, 0);
