@@ -11,7 +11,7 @@ Structure:
   "meta": {"year": 2026, "last_updated": "...", "total_days": N},
   "by_date": {
     "2026-03-19": {
-      "00700": {"tv": 26800000000, "vol": 62450000},
+      "00700": {"tv": 26800000000, "vol": 62450000, "close": 481.60},
       ...
     }
   }
@@ -111,7 +111,7 @@ def migrate_from_flat(flat_path: str = "daily_turnover_history.json"):
 def save_day(d: datetime, records: dict):
     """
     Save one day's turnover/volume into the library.
-    records: {code: {"tv": int, "vol": int}}
+    records: {code: {"tv": int, "vol": int, "close": float}}
     """
     if not records:
         return
@@ -187,6 +187,55 @@ def get_tv_history(code: str, n: int, before: str) -> list:
             if len(result) >= n:
                 return result
     return result
+
+
+
+def get_close_history(code: str, n: int, before: str) -> list:
+    """
+    Return last n closing prices for a stock before date `before`
+    (YYYY-MM-DD), newest-first. Skips days with no data.
+    Alias: get_price_history (preferred name for chart construction).
+    """
+    code5  = code.zfill(5)
+    result = []
+    for year in sorted(all_years(), reverse=True):
+        p = lib_path(year)
+        if not os.path.exists(p):
+            continue
+        with open(p, encoding="utf-8") as f:
+            by_date = json.load(f).get("by_date", {})
+        for ds in sorted(by_date.keys(), reverse=True):
+            if ds >= before:
+                continue
+            rec   = by_date[ds].get(code5, {})
+            close = rec.get("close", 0.0) if isinstance(rec, dict) else 0.0
+            if close > 0:
+                result.append(float(close))
+            if len(result) >= n:
+                return result
+    return result
+
+
+
+# Preferred alias for chart construction — same as get_close_history
+get_price_history = get_close_history
+
+
+def get_close(code: str, ds_yyyymmdd: str) -> float:
+    """
+    Return closing price for a stock on a given date (YYYYMMDD format).
+    Returns 0.0 if not found.
+    """
+    year = int(ds_yyyymmdd[:4])
+    ds   = f"{ds_yyyymmdd[:4]}-{ds_yyyymmdd[4:6]}-{ds_yyyymmdd[6:8]}"
+    p    = lib_path(year)
+    if not os.path.exists(p):
+        return 0.0
+    with open(p, encoding="utf-8") as f:
+        rec = json.load(f).get("by_date", {}).get(ds, {}).get(code.zfill(5), {})
+    if isinstance(rec, dict):
+        return float(rec.get("close", 0.0))
+    return 0.0
 
 
 def load_recent(n_days: int, before: str) -> dict:

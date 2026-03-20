@@ -10,7 +10,7 @@ from ccass_library import (get_pct_history, get_sh_history,
                             all_stored_dates as ccass_all_stored_dates)
 from short_library import save_day as short_save_day, get_short_history, get_short_ratio_history
 from turnover_library import (save_day as tv_save_day, get_tv_history,
-                               get_vol_history,
+                               get_vol_history, get_close_history, get_close,
                                load_recent as tv_load_recent, get_tv)
 
 from sc_top10_library import get_top10, get_top10_history
@@ -191,25 +191,25 @@ def get_daily_quotation(date: datetime = None) -> pd.DataFrame:
         pre  = BeautifulSoup(text, "html.parser").find("pre")
         body = pre.get_text() if pre else text
 
-        PAT_A = re.compile(
-            r"^[\*\s]{0,5}(\d{1,5})\s+([A-Z][A-Z0-9 \-&'./#+]{1,22}?)\s{2,}"
-            r"(.{1,30}?)\s*(?:HKD|USD|CNY|EUR|GBP)\s+([\d,]{5,})\s+([\d,]{5,})\s+[\d,.]+\s+[\d,.]+\s*$"
-        )
-        PAT_B = re.compile(
+        # Pattern B only — the full HKEX line format:
+        # CODE  NAME  CHI  HKD  PRV  BID  CLOSE  HIGH  LOW  CLOSE  SHARES  TURNOVER
+        # group(4)=shares  group(5)=turnover (8+ digits ensures it's HKD not share count)
+        # Columns: CODE NAME CHI CURR PRV BID ASK OPEN HIGH LOW CLOSE SHARES TURNOVER
+        #            1    2    3   4    5   6   7   8    9   10  11    12     13
+        PAT = re.compile(
             r"^[\*\s]{0,5}(\d{1,5})\s+([A-Z][A-Z0-9 \-&'./#+]{1,22}?)\s{2,}"
             r"(.{1,30}?)\s*(?:HKD|USD|CNY|EUR|GBP)\s+"
             r"[\d,.]+\s+[\d,.]+\s+[\d,.]+\s+[\d,.]+\s+[\d,.]+\s+[\d,.]+\s+"
-            r"([\d,]{5,})\s+([\d,]{8,})\s*$"
+            r"([\d,.]+)\s+"            # group(4) = closing price (col 11)
+            r"([\d,]{5,})\s+"          # group(5) = shares traded (col 12)
+            r"([\d,]{8,})\s*$"         # group(6) = HKD turnover  (col 13)
         )
 
-        records    = []
-        seen_codes = set()
-        name_map   = {}
+        best     = {}   # code -> record; kept for dedup (same code = take max turnover)
+        name_map = {}
 
         for line in body.splitlines():
-            ma = PAT_A.match(line)
-            mb = PAT_B.match(line) if not ma else None
-            m  = ma or mb
+            m = PAT.match(line)
             if not m:
                 continue
             code_int = int(m.group(1))
@@ -218,25 +218,22 @@ def get_daily_quotation(date: datetime = None) -> pd.DataFrame:
             code     = str(code_int).zfill(5)
             name_eng = m.group(2).strip()
             name_chi = re.sub(r'[\u3000\uff20\uff64\s]+$', '', m.group(3)).strip()
-            # PAT_A: group(4)=turnover, group(5)=shares
-            # PAT_B: group(4)=shares,   group(5)=turnover
-            if ma:
-                turnover = float(m.group(4).replace(',', ''))
-                volume   = float(m.group(5).replace(',', ''))
-            else:
-                volume   = float(m.group(4).replace(',', ''))
-                turnover = float(m.group(5).replace(',', ''))
+            close    = float(m.group(4).replace(',', ''))   # closing price (col 11)
+            volume   = float(m.group(5).replace(',', ''))   # shares traded (col 12)
+            turnover = float(m.group(6).replace(',', ''))   # HKD turnover  (col 13)
             if not _is_valid_chinese(name_chi):
                 name_chi = name_eng
-            if code not in seen_codes and turnover > 0:
-                # Prefer verified name from stock_ref, fall back to Big5 decode
+            if turnover <= 0:
+                continue
+            if code not in best or turnover > best[code]["turnover"]:
                 zh = get_zh_name(code) or (name_chi if _is_valid_chinese(name_chi) else name_eng)
-                records.append({"stock_code": code, "name": name_eng,
-                                 "name_chi": zh, "turnover": turnover, "shares": volume})
-                seen_codes.add(code)
-                # Only add to name_map if not already verified from stock_ref
+                best[code] = {"stock_code": code, "name": name_eng,
+                              "name_chi": zh, "turnover": turnover,
+                              "shares": volume, "close": close}
                 if not get_zh_name(code):
                     name_map[code] = {"en": name_eng, "zh": zh}
+
+        records = list(best.values())
 
         if not records:
             log.warning("Daily quotation: 0 records for %s", date_str)
@@ -441,8 +438,11 @@ RANK_HISTORY_FILE = "rank_history.json"
 def save_daily_turnover(date: datetime, df: pd.DataFrame):
     if df.empty:
         return
-    tv_save_day(date, {r.stock_code: {"tv": int(r.turnover), "vol": int(r.shares)}
-                       for r in df.itertuples()})
+    tv_save_day(date, {r.stock_code: {
+        "tv":    int(r.turnover),
+        "vol":   int(r.shares),
+        "close": float(r.close) if hasattr(r, "close") and r.close else 0.0,
+    } for r in df.itertuples()})
 
 def save_rank_history(date: datetime, results: list):
     store = load_store(RANK_HISTORY_FILE)
@@ -823,6 +823,12 @@ def run_analysis():
               "name_map": load_store(NAME_MAP_FILE), "stocks": results}
     with open("data.json", "w", encoding="utf-8") as f:
         json.dump(output, f, ensure_ascii=False, separators=(",", ":"))
+    # Sanity check: warn if any stock has sb_total > turnover (impossible — means stale JSON)
+    bad = [(r["code"], r["name_chi"], r["sb_total"], r["turnover"])
+           for r in results if r["turnover"] > 0 and r["sb_total"] > r["turnover"]]
+    if bad:
+        log.warning("sb_total > turnover for %d stocks — run --reparse to fix: %s",
+                    len(bad), [(c, int(st/1e8), int(tv/1e8)) for c,n,st,tv in bad[:5]])
     log.info("data.json written: %d stocks", len(results))
     save_rank_history(trading_day, results)
 
