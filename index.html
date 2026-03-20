@@ -712,7 +712,15 @@ const CHART_CACHE_KEY = 'hk_chart_data';
 // Restore last chart data immediately so chart renders on first paint
 try {
   const cc = localStorage.getItem(CHART_CACHE_KEY);
-  if (cc) lastChartData = JSON.parse(cc);
+  if (cc) {
+    const parsed = JSON.parse(cc);
+    // Only use cache if it has real non-zero data
+    if (parsed.length && parsed.some(s => s.sb_net !== 0)) {
+      lastChartData = parsed;
+    } else {
+      localStorage.removeItem(CHART_CACHE_KEY);
+    }
+  }
 } catch(e) {}
 
 function applyData(d, stale) {
@@ -736,12 +744,15 @@ function applyData(d, stale) {
 }
 
 async function loadData() {
-  // 1. Show cached data immediately if available
+  // 1. Show cached data immediately if available and valid
   try {
     const cached = localStorage.getItem(CACHE_KEY);
     if (cached) {
       const d = JSON.parse(cached);
-      applyData(d, true);   // stale indicator shown
+      // Only use if it has real stock data
+      if (d.stocks && d.stocks.length > 0) {
+        applyData(d, true);
+      }
     }
   } catch(e) { /* ignore bad cache */ }
 
@@ -790,7 +801,9 @@ function generateMockData() {
     const tv  = Math.round(Math.random()*4e9 + 2e8);
     const sr  = s.stock_type==='etf' ? 40+Math.random()*30 : s.stock_type==='stable' ? 3+Math.random()*8 : 8+Math.random()*20;
     const sa  = sr + (Math.random()-0.5)*4;
-    const sbn = i < SB_TOP ? Math.round((Math.random()-0.3)*8e7) : 0;  // only top 10 have sb flow
+    // First 10 stocks have Stock Connect flow — alternating buy/sell for visual variety
+    const flowMag = Math.round((0.3 + Math.random() * 0.7) * 8e7);  // 24M–80M, never 0
+    const sbn = i < SB_TOP ? (i % 3 === 2 ? -flowMag : flowMag) : 0;
     const cd  = Math.round((Math.random()-0.4)*5e6);
     const cc  = Math.round(Math.random()*8)-2;
     const insightPool = ['🔥 挾倉高危', '🐉 異常亢奮', '🏦 北水增持', '🚨 北水流出', '🚨 異常高沽空', '📉 空頭平倉', '', '', ''];
