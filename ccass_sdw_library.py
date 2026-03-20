@@ -157,9 +157,12 @@ def save_day(d: date, stock_code: str, records: list):
 # ── Turnover filter ───────────────────────────────────────────────────────────
 
 def get_qualifying_stocks(d: date) -> list:
-    """Return stock codes with turnover >= MIN_TURNOVER on date d."""
+    """
+    Return stock codes with turnover >= MIN_TURNOVER from the HKEX daily
+    quotation file for date d. Skips warrants/CBBCs (code > 9999).
+    """
     date_str = d.strftime("%y%m%d")
-    url = QUOT_URL.format(date=date_str)
+    url      = QUOT_URL.format(date=date_str)
     try:
         r = requests.get(url, headers=QUOT_HEADERS, timeout=30)
         r.raise_for_status()
@@ -171,6 +174,7 @@ def get_qualifying_stocks(d: date) -> list:
         pre  = BeautifulSoup(text, "html.parser").find("pre")
         body = pre.get_text() if pre else text
 
+        # Pattern B: CODE NAME CHI CURR PRV BID ASK OPEN HIGH LOW CLOSE SHARES TURNOVER
         PAT = re.compile(
             r"^[\*\s]{0,5}(\d{1,5})\s+([A-Z][A-Z0-9 \-&'./#+]{1,22}?)\s{2,}"
             r"(.{1,30}?)\s*(?:HKD|USD|CNY|EUR|GBP)\s+"
@@ -180,28 +184,22 @@ def get_qualifying_stocks(d: date) -> list:
         codes = []
         for line in body.splitlines():
             m = PAT.match(line)
-            if not m:
-                continue
-            code_int = int(m.group(1))
-            if code_int > 9999:
-                continue
-            tv = float(m.group(4).replace(",", ""))
-            if tv >= MIN_TURNOVER:
-                codes.append(str(code_int).zfill(5))
+            if not m: continue
+            if int(m.group(1)) > 9999: continue
+            if float(m.group(4).replace(",", "")) >= MIN_TURNOVER:
+                codes.append(str(int(m.group(1))).zfill(5))
 
         log.info("Qualifying stocks %s: %d (tv ≥ %s HKD)",
                  d.isoformat(), len(codes), f"{MIN_TURNOVER:,}")
         return codes
 
     except requests.HTTPError as e:
-        if e.response.status_code == 404:
-            log.warning("Quotation 404 for %s", date_str)
-        else:
-            log.error("get_qualifying_stocks (%s): %s", date_str, e)
+        log.warning("Quotation %s for %s — skipping", e.response.status_code, date_str)
         return []
     except Exception as e:
         log.error("get_qualifying_stocks (%s): %s", date_str, e)
         return []
+
 
 
 # ── SDW fetch for one stock ───────────────────────────────────────────────────
