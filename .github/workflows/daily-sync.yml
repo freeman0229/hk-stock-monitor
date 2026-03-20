@@ -18,6 +18,7 @@ on:
           - both-weekly
           - ccass-build      # full CCASS build from 2025-01-01 (run multiple times)
           - sc-top10-build   # full Stock Connect top10 build (run multiple times)
+          - sdw-build        # full SDW participant holdings backfill (run multiple times)
 
 # Cancel any in-progress run of the same workflow when a new one is triggered.
 # This prevents multiple github-pages artifacts accumulating across runs,
@@ -51,6 +52,15 @@ jobs:
       - name: Refresh CCASS participant list (weekly)
         run: python ccass_participant_library.py --update
 
+      - name: SDW participant holdings (Thu/Fri weekly)
+        run: |
+          DOW=$(date +%u)   # 1=Mon … 4=Thu, 5=Fri
+          if [ "$DOW" = "4" ] || [ "$DOW" = "5" ]; then
+            python ccass_sdw_library.py --update
+          else
+            echo "Not Thu/Fri (DOW=$DOW) — skipping SDW fetch"
+          fi
+
       - name: Run daily analysis
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
@@ -64,7 +74,7 @@ jobs:
           for f in data.json rank_history.json name_map.json; do
             [ -f "$f" ] && git add "$f"
           done
-          for f in ccass_20*.json sc_top10_20*.json short_20*.json turnover_20*.json; do
+          for f in ccass_20*.json ccass_sdw_20*.json sc_top10_20*.json short_20*.json turnover_20*.json; do
             [ -f "$f" ] && git add "$f"
           done
           git diff --staged --quiet || \
@@ -127,6 +137,31 @@ jobs:
           for f in sc_top10_20*.json; do [ -f "$f" ] && git add "$f"; done
           git diff --staged --quiet || \
             (git commit -m "SC top10 build: $(date +'%Y-%m-%d %H:%M')" && git push)
+
+  # ── SDW full backfill (manual, resume-able) ─────────────────────────────────
+  sdw-build:
+    name: SDW participant holdings full backfill
+    runs-on: ubuntu-latest
+    timeout-minutes: 320
+    permissions:
+      contents: write
+    if: |
+      github.event_name == 'workflow_dispatch' && inputs.job == 'sdw-build'
+
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - uses: actions/setup-python@v5.6.0
+        with: { python-version: '3.11', cache: 'pip' }
+      - run: pip install -r requirements.txt
+      - name: Build SDW holdings library (resumes from last stored date)
+        run: python ccass_sdw_library.py
+      - name: Commit progress
+        run: |
+          git config --global user.name "Bot"
+          git config --global user.email "bot@github.com"
+          for f in ccass_sdw_20*.json; do [ -f "$f" ] && git add "$f"; done
+          git diff --staged --quiet || \
+            (git commit -m "SDW build: $(date +'%Y-%m-%d %H:%M')" && git push)
 
   # ── SFC weekly (Saturday 10:00 HKT) ─────────────────────────────────────────
   sfc-weekly:
