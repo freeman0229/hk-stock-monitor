@@ -16,7 +16,7 @@ on:
           - sfc-weekly
           - di-weekly
           - both-weekly
-          - ccass-build      # full 12-month CCASS build (run multiple times)
+          - ccass-build      # full CCASS build from 2025-01-01 (run multiple times)
           - sc-top10-build   # full Stock Connect top10 build (run multiple times)
 
 jobs:
@@ -25,7 +25,7 @@ jobs:
   daily:
     name: Daily analysis
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     permissions:
       contents: write
     if: |
@@ -62,7 +62,7 @@ jobs:
 
   # ── CCASS full build (manual, resume-able) ───────────────────────────────────
   ccass-build:
-    name: CCASS full 12-month build
+    name: CCASS full build (2025-01-01 to today)
     runs-on: ubuntu-latest
     timeout-minutes: 320
     permissions:
@@ -100,6 +100,12 @@ jobs:
       - uses: actions/setup-python@v5.6.0
         with: { python-version: '3.11', cache: 'pip' }
       - run: pip install -r requirements.txt
+      - name: Restore SC top10 cache
+        uses: actions/cache@v4
+        with:
+          path: sc_cache
+          key: sc-top10-cache-${{ github.run_id }}
+          restore-keys: sc-top10-cache-
       - name: Build Stock Connect top10 library (resumes from last saved date)
         run: python sc_top10_library.py
       - name: Commit progress
