@@ -224,38 +224,19 @@ def parse_js(text: str) -> dict | None:
                 for s in _parse_top10(tbl, is_southbound=True):
                     szse_stocks[s["code"]] = s
 
-    # Merge SSE + SZSE top10 into combined ranking by total turnover
-    all_codes = set(sse_stocks) | set(szse_stocks)
-    combined  = []
-    for code in all_codes:
-        e = sse_stocks.get(code, {})
-        z = szse_stocks.get(code, {})
-        name     = _clean_name(e.get("name") or z.get("name") or "")
-        sse_buy  = e.get("buy",   0)
-        sse_sell = e.get("sell",  0)
-        sse_tot  = e.get("total", 0)
-        sz_buy   = z.get("buy",   0)
-        sz_sell  = z.get("sell",  0)
-        sz_tot   = z.get("total", 0)
-        combined.append({
-            "code":       code,
-            "name":       name,
-            "sse_buy":    sse_buy,
-            "sse_sell":   sse_sell,
-            "sse_total":  sse_tot,
-            "szse_buy":   sz_buy,
-            "szse_sell":  sz_sell,
-            "szse_total": sz_tot,
-            "buy":        sse_buy  + sz_buy,
-            "sell":       sse_sell + sz_sell,
-            "total":      sse_tot  + sz_tot,
-            "rank_sse":   e.get("rank", 0),
-            "rank_szse":  z.get("rank", 0),
-        })
+    # Combine SSE + SZSE: sum buy/sell/total per code, order by best rank
+    merged = {}
+    for s in list(sse_stocks.values()) + list(szse_stocks.values()):
+        code = s["code"]
+        if code not in merged:
+            merged[code] = {"code": code, "name": s["name"],
+                            "buy": 0, "sell": 0, "total": 0, "rank": 99}
+        merged[code]["buy"]   += s["buy"]
+        merged[code]["sell"]  += s["sell"]
+        merged[code]["total"] += s["total"]
+        merged[code]["rank"]   = min(merged[code]["rank"], s["rank"])
 
-    # Sort by combined total descending
-    combined.sort(key=lambda x: x["total"], reverse=True)
-    result["top10"] = combined
+    result["top10"] = sorted(merged.values(), key=lambda x: x["rank"])
     return result
 
 
