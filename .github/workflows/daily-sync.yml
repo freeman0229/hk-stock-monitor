@@ -106,6 +106,8 @@ jobs:
           path: sc_cache
           key: sc-top10-cache-${{ github.run_id }}
           restore-keys: sc-top10-cache-
+      - name: Clear stale sc_cache (stored parsed JSON, not raw JS)
+        run: python sc_top10_library.py --clear-cache
       - name: Build Stock Connect top10 library (resumes from last saved date)
         run: python sc_top10_library.py
       - name: Commit progress
