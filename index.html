@@ -501,13 +501,14 @@ tbody td { padding: 9px 12px; vertical-align: middle; }
           <th class="num-r" data-col="sb_net">淨流入</th>
           <th class="num-r mob-hide" data-col="sb_buy">買入</th>
           <th class="num-r mob-hide" data-col="sb_sell">賣出</th>
+          <th class="num-r mob-hide" data-col="short_ratio">沽空%</th>
           <th class="num-r mob-hide" data-col="ccass_delta">CCASS變動%</th>
           <th class="num-r mob-hide" data-col="ccass_consec">連續日數</th>
           <th data-col="insight">信號</th>
         </tr>
       </thead>
       <tbody id="body-bshui">
-        <tr><td colspan="8"><div class="loading-box"><div class="spinner"></div>載入中…</div></td></tr>
+        <tr><td colspan="9"><div class="loading-box"><div class="spinner"></div>載入中…</div></td></tr>
       </tbody>
     </table>
   </div>
@@ -927,7 +928,7 @@ function drawSbChart(sorted) {
       // Landscape / laptop: full labels
       ctx.fillStyle = '#aaa';
       ctx.font = '12px monospace';
-      ctx.fillText(String(s.rank || i+1).padStart(2,'0'), 4, cy);
+      ctx.fillText(String(i + 1).padStart(2,'0'), 4, cy);
 
       let rcColor = '#aaa', rcText = '—';
       if (isNew || rc === null) { rcColor = '#c0252d'; rcText = 'NEW'; }
@@ -1037,7 +1038,7 @@ function renderBshui() {
     const prevRank  = prevRankMap[s.code];
     const sbRankChange = prevRank != null ? prevRank - todayRank : null;
     return { ...s, sb_rank_change: sbRankChange };
-  }).sort((a,b) => (a.rank || 999) - (b.rank || 999));
+  });
 
   // Save to cache if we have real data, use cache if display is empty
   if (display.length) {
@@ -1052,18 +1053,20 @@ function renderBshui() {
   // Build table rows
   const html = display.slice(0, getTableRows()).map((s,i) => {
     const netClass = s.sb_net > 0 ? 'up-txt' : 'dn-txt';
+    const srClass  = s.short_ratio > s.short_avg5 ? 'up-txt' : '';
     return `<tr>
       <td class="rank">${i+1}</td>
       <td><span class="name-cell">${s.name_chi}</span><span class="name-zh">${s.code}</span></td>
       <td class="num-r ${netClass}">${sign(s.sb_net)}${fmtM(s.sb_net)}</td>
       <td class="num-r mob-hide">${fmtM(s.sb_buy)}</td>
       <td class="num-r mob-hide">${fmtM(s.sb_sell)}</td>
+      <td class="num-r mob-hide ${srClass}">${s.short_ratio != null ? fmtPct(s.short_ratio) : '—'}</td>
       <td class="num-r mob-hide ${s.ccass_delta>0?'up-txt':s.ccass_delta<0?'dn-txt':''}">${s.pct_delta != null && s.pct_delta !== 0 ? (s.pct_delta > 0 ? '+' : '') + s.pct_delta.toFixed(2) + '%' : '—'}</td>
       <td class="num-r mob-hide ${s.ccass_consec>0?'up-txt':s.ccass_consec<0?'dn-txt':''}">${fmtConsec(s)}</td>
       <td>${insightBadge(s.insight)}</td>
     </tr>`;
   }).join('');
-  document.getElementById('body-bshui').innerHTML = html || '<tr><td colspan="8" class="loading-box">無北水數據</td></tr>';
+  document.getElementById('body-bshui').innerHTML = html || '<tr><td colspan="9" class="loading-box">無北水數據</td></tr>';
 
   // Update ticker
   const sbNet = display.reduce((a,s) => a+s.sb_net, 0);
