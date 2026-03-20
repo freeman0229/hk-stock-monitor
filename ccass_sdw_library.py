@@ -63,7 +63,7 @@ QUOT_HEADERS = {
     "Referer":    "https://www.hkex.com.hk/",
 }
 START_DATE    = date(2025, 3, 21)
-MIN_TURNOVER  = 20_000_000
+MIN_TURNOVER  = 66_600_000
 SLEEP_SEC     = 1.5
 
 # HK public holidays for the library range
