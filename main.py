@@ -605,10 +605,10 @@ def run_analysis():
     # 1. Daily quotation
     df_quote = get_daily_quotation(trading_day)
     if df_quote.empty:
-        # HKEX file not yet published or unavailable — rebuild from local turnover cache
-        # rather than aborting, so the analysis can still run with yesterday's rankings.
+        # HKEX file not yet published — rebuild from local turnover cache so the
+        # analysis can still run with yesterday's rankings instead of hard-aborting.
         log.warning("Daily quotation unavailable for %s — attempting cache fallback", today_ds)
-        _fallback_tv = tv_load_recent(1, today_ds)   # most recent stored day before today
+        _fallback_tv = tv_load_recent(1, today_ds)
         if _fallback_tv:
             _fallback_ds  = max(_fallback_tv.keys())
             _fallback_day = _fallback_tv[_fallback_ds]
@@ -738,21 +738,21 @@ def run_analysis():
     sb_map = {}   # code -> {buy, sell, net, rank, total} in HKD
     sb_date_used = today_ds
     # Minimum stocks to consider sc_top10 data valid.
-    # HKEX typically publishes 10 net-buy + 10 net-sell entries; accept >= 5
-    # to guard against partial/early fetches being stored and used as gospel.
+    # HKEX typically publishes 10 net-buy + 10 net-sell; accept >= 5 to guard
+    # against partial/early fetches (e.g. 1 stock) being stored and used.
     _MIN_SB = 5
 
     # 1. Try library (already stored from previous run or --reparse)
     sb_map = _build_sb_map(get_top10(today_ds))
     if sb_map and len(sb_map) < _MIN_SB:
-        log.warning("Southbound top10: library has only %d stocks for %s (< %d) — "
-                    "treating as incomplete, will attempt live fetch", len(sb_map), today_ds, _MIN_SB)
-        sb_map = {}   # discard thin data; live fetch below will overwrite library if better
+        log.warning("Southbound top10: library has only %d stocks for %s — discarding, will re-fetch",
+                    len(sb_map), today_ds)
+        sb_map = {}
 
-    # 2. If empty or thin, try live fetch from HKEX and store immediately
+    # 2. If not in library, try live fetch from HKEX and store immediately
     if not sb_map:
         log.info("Southbound top10: not in library for %s — attempting live fetch", today_ds)
-        live_rec = sc_fetch_day(trading_day.date() if hasattr(trading_day, 'date') else _date.fromisoformat(today_ds))
+        live_rec   = sc_fetch_day(trading_day.date() if hasattr(trading_day, 'date') else _date.fromisoformat(today_ds))
         live_count = len(live_rec.get("top10", [])) if live_rec else 0
         if live_rec and live_count >= _MIN_SB:
             year = trading_day.year

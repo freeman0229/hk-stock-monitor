@@ -191,10 +191,22 @@ def migrate_schema():
 
 # ── Turnover filter ───────────────────────────────────────────────────────────
 
+def _last_trading_day(ref: date = None) -> date:
+    """Return the most recent weekday that is not a HK public holiday."""
+    d = ref or date.today()
+    for _ in range(10):
+        if d.weekday() < 5 and d not in _HK_HOLIDAYS:
+            return d
+        d -= timedelta(days=1)
+    return ref or date.today()
+
 def get_qualifying_stocks(ref_date: date = None) -> list:
-    d        = ref_date or date.today()
+    # Always use the most recent trading day so this works correctly when
+    # called on weekends or public holidays (e.g. sdw-build triggered Saturday).
+    d        = _last_trading_day(ref_date)
     date_str = d.strftime("%y%m%d")
     url      = QUOT_URL.format(date=date_str)
+    log.info("Qualifying stocks: using quotation date %s", d.isoformat())
     try:
         r = requests.get(url, headers=QUOT_HEADERS, timeout=30)
         r.raise_for_status()

@@ -239,22 +239,33 @@ def _parse_excel(data: bytes, report_date: date) -> dict | None:
     header_idx = None
     col_code = col_name = col_sh = col_hkd = col_pct = None
 
+    def _is_hkd_col(c: str) -> bool:
+        # SFC Excel files sometimes use Unicode fullwidth dollar U+FF04 (\uff04)
+        # instead of ASCII $ — "hk\uff04" never matches "hk$", so col_hkd stays
+        # None and every row is stored with hkd=0.  Normalise before matching.
+        cn = c.replace("\uff04", "$")
+        return any(kw in cn for kw in ("hk$", "hkd", "\u6e2f\u5143", "\u91d1\u984d", "value", "amount"))
+
+    def _is_sh_col(c: str) -> bool:
+        return ("share" in c or "\u80a1\u6578" in c or "\u6de1\u5009" in c) and not _is_hkd_col(c)
+
     for i, row in enumerate(rows):
         cells = [str(c).lower() if c is not None else "" for c in row]
         combined = " ".join(cells)
-        if ("code" in combined or "代號" in combined) and ("share" in combined or "股數" in combined):
+        if (("code" in combined or "\u4ee3\u865f" in combined or "\u80a1\u4efd\u4ee3\u865f" in combined)
+                and ("share" in combined or "\u80a1\u6578" in combined or "\u6de1\u5009" in combined)):
             header_idx = i
-            # Map column positions
             for j, c in enumerate(cells):
-                if ("code" in c or "代號" in c) and col_code is None:
+                if ("code" in c or "\u4ee3\u865f" in c) and col_code is None:
                     col_code = j
-                elif "name" in c or "名稱" in c:
+                elif ("name" in c or "\u540d\u7a31" in c) and col_name is None:
                     col_name = j
-                elif ("share" in c or "股數" in c) and col_sh is None:
+                elif _is_sh_col(c) and col_sh is None:
                     col_sh = j
-                elif ("hk$" in c or "hkd" in c or "港元" in c or "value" in c) and col_hkd is None:
+                elif _is_hkd_col(c) and col_hkd is None:
                     col_hkd = j
-                elif ("%" in c or "percent" in c or "issued" in c) and col_pct is None:
+                elif ("%" in c or "percent" in c or "issued" in c
+                      or "\u5df2\u767c\u884c" in c or "\u767e\u5206\u6bd4" in c) and col_pct is None:
                     col_pct = j
             break
 
@@ -323,6 +334,37 @@ def _parse_excel(data: bytes, report_date: date) -> dict | None:
     return result
 
 # ── Build / update ────────────────────────────────────────────────────────────
+
+def reparse(specific_date: date = None):
+    """
+    Re-parse all (or one) already-cached Excel files from sfc_cache/ and
+    overwrite the stored JSON records.  Use this after fixing column-detection
+    logic to repair existing files without re-downloading anything.
+    Dates with no cache file are skipped silently.
+    """
+    dates = [specific_date] if specific_date else all_report_fridays()
+    reparsed = no_cache = parse_fail = 0
+    for d in dates:
+        cache_file = os.path.join(CACHE_DIR, f"sfc_{d.strftime('%Y%m%d')}.xlsx")
+        if not os.path.exists(cache_file):
+            no_cache += 1
+            continue
+        with open(cache_file, "rb") as f:
+            raw = f.read()
+        records = _parse_excel(raw, d)
+        if not records:
+            log.warning("Re-parse failed for %s", d.isoformat())
+            parse_fail += 1
+            continue
+        lib = load_year(d.year)
+        lib["by_date"][d.isoformat()] = records
+        save_year(d.year, lib)
+        reparsed += 1
+        total_hkd = records.get("__total__", {}).get("hkd", 0)
+        log.info("Re-parsed %s → %d stocks  total HKD %.2fbn",
+                 d.isoformat(), len(records) - 1, total_hkd / 1e9)
+    log.info("Reparse done: %d reparsed | %d no cache | %d failed",
+             reparsed, no_cache, parse_fail)
 
 def build(update_only: bool = False, specific_date: date = None):
     if specific_date:
@@ -434,13 +476,34 @@ def _query(code: str, top: int):
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--update",  action="store_true", help="Only fetch missing dates")
-    ap.add_argument("--date",    metavar="YYYY-MM-DD", help="Fetch one specific date")
-    ap.add_argument("--query",   metavar="CODE",       help="Show stored history")
+    ap.add_argument("--reparse", action="store_true", help="Re-parse cached Excel files (fixes col detection bugs)")
+    ap.add_argument("--inspect", action="store_true", help="Print stored totals — verify hkd != 0")
+    ap.add_argument("--date",    metavar="YYYY-MM-DD", help="Target one specific date")
+    ap.add_argument("--query",   metavar="CODE",       help="Show stored position history")
     ap.add_argument("--top",     type=int, default=20)
     args = ap.parse_args()
 
     if args.query:
         _query(args.query, args.top)
+    elif args.reparse:
+        reparse(specific_date=date.fromisoformat(args.date) if args.date else None)
+    elif args.inspect:
+        for year in range(START_DATE.year, date.today().year + 1):
+            p = lib_path(year)
+            if not os.path.exists(p):
+                continue
+            with open(p, encoding="utf-8") as f:
+                by_date = json.load(f).get("by_date", {})
+            print(f"\n\u2500\u2500 sfc_{year}.json ({len(by_date)} dates) \u2500\u2500")
+            print(f"{'Date':<12} {'Total HKD':>20} {'Total Sh':>16} {'Stocks':>7}")
+            print("\u2500" * 60)
+            for ds in sorted(by_date.keys()):
+                t      = by_date[ds].get("__total__", {})
+                stocks = len([k for k in by_date[ds] if k != "__total__"])
+                hkd    = t.get("hkd", 0)
+                sh     = t.get("sh",  0)
+                flag   = "  <- HKD=0 !" if hkd == 0 else ""
+                print(f"{ds:<12} {hkd:>20,.0f} {sh:>16,} {stocks:>7}{flag}")
     else:
         build(update_only=args.update,
               specific_date=date.fromisoformat(args.date) if args.date else None)
