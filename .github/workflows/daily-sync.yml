@@ -56,7 +56,13 @@ jobs:
         run: |
           DOW=$(date +%u)   # 1=Mon … 4=Thu, 5=Fri
           if [ "$DOW" = "4" ] || [ "$DOW" = "5" ]; then
-            python ccass_sdw_library.py --update
+            # Pass today's date explicitly so the script fetches ONLY this week's date.
+            # Using --update would attempt to backfill ALL missing weeks (4+ hours) and
+            # always time-out before committing.  Historical backfill is handled by the
+            # manual sdw-build job (timeout-minutes: 320, resumable).
+            SDW_DATE=$(date +%Y-%m-%d)
+            echo "Fetching SDW for $SDW_DATE"
+            python ccass_sdw_library.py --date "$SDW_DATE"
           else
             echo "Not Thu/Fri (DOW=$DOW) — skipping SDW fetch"
           fi
