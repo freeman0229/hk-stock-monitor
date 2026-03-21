@@ -19,6 +19,7 @@ on:
           - ccass-build      # full CCASS build from 2025-01-01 (run multiple times)
           - sc-top10-build   # full Stock Connect top10 build (run multiple times)
           - sdw-build        # full SDW participant holdings backfill (run multiple times)
+          - sfc-reparse      # re-parse all cached SFC Excel files (fixes hkd=0 bug)
 
 # Cancel any in-progress run of the same workflow when a new one is triggered.
 # This prevents multiple github-pages artifacts accumulating across runs,
@@ -56,13 +57,10 @@ jobs:
         run: |
           DOW=$(date +%u)   # 1=Mon … 4=Thu, 5=Fri
           if [ "$DOW" = "4" ] || [ "$DOW" = "5" ]; then
-            # Pass today's date explicitly so the script fetches ONLY this week's date.
-            # Using --update would attempt to backfill ALL missing weeks (4+ hours) and
-            # always time-out before committing.  Historical backfill is handled by the
-            # manual sdw-build job (timeout-minutes: 320, resumable).
-            SDW_DATE=$(date +%Y-%m-%d)
-            echo "Fetching SDW for $SDW_DATE"
-            python ccass_sdw_library.py --date "$SDW_DATE"
+            # Use --date so we only fetch THIS week — --update would try all
+            # 50+ missing weeks, hit the 45-min timeout, and commit nothing.
+            # Historical backfill is handled by the manual sdw-build job.
+            python ccass_sdw_library.py --date "$(date +%Y-%m-%d)"
           else
             echo "Not Thu/Fri (DOW=$DOW) — skipping SDW fetch"
           fi
@@ -193,6 +191,8 @@ jobs:
           restore-keys: sfc-cache-
       - name: Update SFC library
         run: python sfc_library.py --update
+      - name: Re-parse cached Excel files
+        run: python sfc_library.py --reparse
       - name: Commit
         run: |
           git config --global user.name "Bot"
@@ -200,6 +200,39 @@ jobs:
           for f in sfc_20*.json; do [ -f "$f" ] && git add "$f"; done
           git diff --staged --quiet || \
             (git commit -m "SFC weekly: $(date +'%Y-%m-%d')" && git push)
+
+  # ── SFC reparse (manual — repairs hkd=0 in historical JSON from cache) ───────
+  sfc-reparse:
+    name: SFC reparse cached Excel files
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    if: |
+      github.event_name == 'workflow_dispatch' && inputs.job == 'sfc-reparse'
+
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - uses: actions/setup-python@v5.6.0
+        with: { python-version: '3.11', cache: 'pip' }
+      - run: pip install -r requirements.txt
+      - name: Restore SFC cache
+        uses: actions/cache@v4
+        with:
+          path: sfc_cache
+          key: sfc-cache-${{ github.run_id }}
+          restore-keys: sfc-cache-
+      - name: Reparse all cached Excel files
+        run: python sfc_library.py --reparse
+      - name: Inspect results
+        run: python sfc_library.py --inspect
+      - name: Commit
+        run: |
+          git config --global user.name "Bot"
+          git config --global user.email "bot@github.com"
+          for f in sfc_20*.json; do [ -f "$f" ] && git add "$f"; done
+          git diff --staged --quiet || \
+            (git commit -m "SFC reparse: $(date +'%Y-%m-%d')" && git push)
 
   # ── DI weekly (Saturday 10:00 HKT) ──────────────────────────────────────────
   di-weekly:
