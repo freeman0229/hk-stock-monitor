@@ -12,6 +12,16 @@ from short_library import save_day as short_save_day, get_short_history, get_sho
 from turnover_library import (save_day as tv_save_day, get_tv_history,
                                get_vol_history, get_close_history, get_close,
                                load_recent as tv_load_recent, get_tv)
+try:
+    from sfc_library import get_short_position as sfc_get_position, all_report_fridays as sfc_fridays
+    _SFC_AVAILABLE = True
+except ImportError:
+    _SFC_AVAILABLE = False
+try:
+    from ccass_sdw_library import get_latest_total_sh as sdw_get_total_sh
+    _SDW_AVAILABLE = True
+except ImportError:
+    _SDW_AVAILABLE = False
 
 from sc_top10_library import get_top10, get_top10_history
 
@@ -495,10 +505,13 @@ def classify_stock(code: str, name: str) -> str:
     return "general"
 
 THRESHOLDS = {
-    "etf":      (40.0, 70.0, 15.0, 0.35),
-    "stable":   ( 5.0, 10.0, 15.0, 0.50),
-    "bluechip": (10.0, 20.0, 10.0, 0.40),
-    "general":  (10.0, 25.0, 15.0, 0.40),
+    #              lo    hi  spike  cover_drop
+    # cover_drop: today must be below (avg × cover_drop) to fire 空頭平倉
+    # 0.60 = ratio only needs to drop 40% from avg (e.g. 20% → 12%)
+    "etf":      (40.0, 70.0, 15.0, 0.60),
+    "stable":   ( 5.0, 10.0, 15.0, 0.60),
+    "bluechip": (10.0, 20.0, 10.0, 0.60),
+    "general":  (10.0, 25.0, 15.0, 0.60),
 }
 
 def classify_insight(code, stock_type, short_ratio, short_avg5, short_ratio_t2,
@@ -507,12 +520,17 @@ def classify_insight(code, stock_type, short_ratio, short_avg5, short_ratio_t2,
                      pct_delta=0.0,
                      days_to_cover=0.0, vol_ratio=0.0,
                      tv_ratio30=0.0, pct_dev30=0.0,
-                     sb_net=0) -> str:
+                     sb_net=0) -> str | None:
+    """
+    Returns one primary signal string, or None.
+    Signals 4 (北水流出) and 5 (異常高沽空) are independent — both checked,
+    combined with | if both fire since they track different phenomena.
+    """
     lo, hi, spike_warn, cover_drop = THRESHOLDS.get(stock_type, THRESHOLDS["general"])
     r_today = turnover / tv_avg5 if tv_avg5 > 0 else 1.0   # used in 空頭平倉
 
-    # ── 挾倉高危 — short squeeze danger ───────────────────────────────────────
-    if days_to_cover > 5 and vol_ratio > 2:                      return "🔥 挾倉高危"
+    # ── 挾倉風險 — short squeeze danger (highest priority) ────────────────────
+    if days_to_cover > 5 and vol_ratio > 2:                      return "🔥 挾倉風險"
 
     # ── 異常亢奮 — abnormal excitement ────────────────────────────────────────
     if (vol_ratio  >  2.5
@@ -524,10 +542,14 @@ def classify_insight(code, stock_type, short_ratio, short_avg5, short_ratio_t2,
             and 1.5 <= tv_ratio30 <= 2.0
             and 0.2 <= pct_dev30  <= 0.5):                        return "🏦 北水增持"
 
-    # ── 北水流出 — northbound net sell + CCASS decreasing ────────────────────
-    if sb_net < 0 and pct_delta < 0:                              return "🚨 北水流出"
+    # ── 北水流出 + 異常高沽空 — independent signals, can both fire ───────────
+    flow_out  = sb_net < 0 and pct_delta < 0
+    high_short = short_ratio > hi + spike_warn
+    if flow_out and high_short:   return "🚨 北水流出｜異常高沽空"
+    if flow_out:                  return "🚨 北水流出"
+    if high_short:                return "🚨 異常高沽空"
 
-    if short_ratio > hi + spike_warn:                             return "🚨 異常高沽空"
+    # ── 空頭平倉 ──────────────────────────────────────────────────────────────
     if (short_avg5 > lo and short_ratio < short_avg5 * cover_drop
             and r_today > 1.30):                                  return "📉 空頭平倉"
     return None
@@ -589,6 +611,8 @@ def run_analysis():
     save_daily_turnover(trading_day, df_quote)
     stock_codes  = df_quote["stock_code"].tolist()
     turnover_map = dict(zip(df_quote["stock_code"], df_quote["turnover"]))
+    # Traded shares (成交股數) from daily quotation — used as short ratio denominator
+    vol_map      = dict(zip(df_quote["stock_code"], df_quote["shares"]))
 
     # 2. Short selling
     df_short  = get_short_sell_today()
@@ -596,9 +620,10 @@ def run_analysis():
     short_map     = {}
     short_vol_map = {}
     for row in df_short.itertuples():
-        tv = turnover_map.get(row.stock_code, 0)
-        if tv > 0:
-            short_map[row.stock_code] = round(row.short_turnover / tv * 100, 2)
+        traded_vol = vol_map.get(row.stock_code, 0)
+        if traded_vol > 0:
+            # short_ratio = 沽空股數 / 成交股數 * 100  (shares ÷ shares)
+            short_map[row.stock_code] = round(row.short_volume / traded_vol * 100, 2)
         short_vol_map[row.stock_code] = int(row.short_volume)
 
     # 3. Short avg
@@ -639,6 +664,29 @@ def run_analysis():
     ccass_streak_pct_map= dict(zip(df_cs["stock_code"], df_cs["ccass_streak_pct"]))
     pct_listed_map      = dict(zip(df_cs["stock_code"], df_cs["pct_listed"]))
     pct_delta_map       = dict(zip(df_cs["stock_code"], df_cs["pct_delta"]))
+
+    # 4b. SFC cumulative short position → sfc_pct per stock
+    # sfc_pct = SFC reportable short shares / SDW 總數 (total CCASS-settled shares) * 100
+    # Uses the most recent SFC Friday report on or before today.
+    sfc_map = {}   # code -> {"sfc_sh": N, "sfc_hkd": N, "sfc_pct": float}
+    if _SFC_AVAILABLE and _SDW_AVAILABLE:
+        try:
+            from datetime import date as _date2
+            _sfc_fridays = [d for d in sfc_fridays() if d <= trading_day.date()]
+            if _sfc_fridays:
+                _latest_sfc_ds = max(_sfc_fridays).isoformat()
+                for code in stock_codes:
+                    pos = sfc_get_position(code, _latest_sfc_ds)
+                    if not pos or pos.get("sh", 0) <= 0:
+                        continue
+                    sfc_sh    = pos["sh"]
+                    sfc_hkd   = pos.get("hkd", 0.0)
+                    total_sh  = sdw_get_total_sh(code, today_ds)
+                    sfc_pct   = round(sfc_sh / total_sh * 100, 4) if total_sh > 0 else 0.0
+                    sfc_map[code] = {"sfc_sh": sfc_sh, "sfc_hkd": sfc_hkd, "sfc_pct": sfc_pct}
+                log.info("SFC short positions: %d stocks from %s", len(sfc_map), _latest_sfc_ds)
+        except Exception as e:
+            log.warning("SFC map build failed: %s", e)
 
     # 5. Southbound top10 (from sc_top10_library)
     # Try library first; if today not stored yet, do a live fetch directly from HKEX.
@@ -758,7 +806,7 @@ def run_analysis():
         pct_delta        = pct_delta_map.get(code, 0.0)
         tv_avg5          = _turnover_avg(code, today_ds, 5)
 
-        # ── 挾倉高危: short volume vs avg 30-day share volume ──────────────────
+        # ── 挾倉風險: short volume vs avg 30-day share volume ──────────────────
         short_vol_today = short_vol_map.get(code, 0)
         vol_hist30      = get_vol_history(code, 30, today_ds)
         avg_vol30       = sum(vol_hist30) / len(vol_hist30) if vol_hist30 else 0
@@ -778,8 +826,11 @@ def run_analysis():
 
         tv_t2_raw      = get_tv(code, t2_key)
         _t2_short      = get_short_history(code, 1, t2_date.strftime("%Y-%m-%d") + "z")
-        short_tv_t2    = _t2_short[0]["st"] if _t2_short else 0.0
-        short_ratio_t2 = round(short_tv_t2 / tv_t2_raw * 100, 2) if tv_t2_raw > 0 else short_ratio
+        # T-2 short ratio: short volume (shares) / traded volume (shares)
+        short_sv_t2    = _t2_short[0]["sv"] if _t2_short else 0
+        vol_t2_raw     = _tv_recent.get(t2_key, {}).get(code, {})
+        vol_t2         = vol_t2_raw.get("vol", 0) if isinstance(vol_t2_raw, dict) else 0
+        short_ratio_t2 = round(short_sv_t2 / vol_t2 * 100, 2) if vol_t2 > 0 else short_ratio
         turnover_t2    = tv_t2_raw if tv_t2_raw > 0 else float(row.turnover)
 
         stock_type       = classify_stock(code, row.name)
@@ -820,6 +871,9 @@ def run_analysis():
             "short_vol":      int(short_vol_today),
             "days_to_cover":  days_to_cover,
             "vol_ratio":      vol_ratio,
+            "sfc_sh":   sfc_map.get(code, {}).get("sfc_sh",  0),
+            "sfc_hkd":  sfc_map.get(code, {}).get("sfc_hkd", 0.0),
+            "sfc_pct":  sfc_map.get(code, {}).get("sfc_pct", 0.0),
             "tv_ratio30":     tv_ratio30,
             "pct_dev30":      round(pct_dev30, 4),
             "ccass_trade_date": t2_date.strftime("%Y-%m-%d"),
