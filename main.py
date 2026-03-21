@@ -605,8 +605,38 @@ def run_analysis():
     # 1. Daily quotation
     df_quote = get_daily_quotation(trading_day)
     if df_quote.empty:
-        msg = "⚠️ 港股看板：今日日報表未能獲取，分析中止。"
-        log.error(msg); send_telegram(msg); return
+        # HKEX file not yet published or unavailable — rebuild from local turnover cache
+        # rather than aborting, so the analysis can still run with yesterday's rankings.
+        log.warning("Daily quotation unavailable for %s — attempting cache fallback", today_ds)
+        _fallback_tv = tv_load_recent(1, today_ds)   # most recent stored day before today
+        if _fallback_tv:
+            _fallback_ds  = max(_fallback_tv.keys())
+            _fallback_day = _fallback_tv[_fallback_ds]
+            _nm           = load_store(NAME_MAP_FILE)
+            _fb_rows      = []
+            for _code, _vals in _fallback_day.items():
+                if isinstance(_vals, dict) and _vals.get("tv", 0) > 0:
+                    _nm_entry = _nm.get(_code, {})
+                    _fb_rows.append({
+                        "stock_code": _code,
+                        "name":       _nm_entry.get("en", _code),
+                        "name_chi":   _nm_entry.get("zh", _code),
+                        "turnover":   _vals["tv"],
+                        "shares":     _vals.get("vol", 0),
+                        "close":      _vals.get("close", 0.0),
+                    })
+            if _fb_rows:
+                df_quote = (pd.DataFrame(_fb_rows)
+                              .sort_values("turnover", ascending=False)
+                              .reset_index(drop=True))
+                log.warning("Cache fallback: using %s data (%d stocks)", _fallback_ds, len(df_quote))
+                send_telegram(
+                    f"⚠️ 港股看板：{today_ds} 日報表未能獲取，"
+                    f"以 {_fallback_ds} 緩存數據繼續分析（排名僅供參考）。"
+                )
+        if df_quote.empty:
+            msg = "⚠️ 港股看板：今日日報表未能獲取，且無緩存數據，分析中止。"
+            log.error(msg); send_telegram(msg); return
 
     save_daily_turnover(trading_day, df_quote)
     stock_codes  = df_quote["stock_code"].tolist()
@@ -707,15 +737,24 @@ def run_analysis():
 
     sb_map = {}   # code -> {buy, sell, net, rank, total} in HKD
     sb_date_used = today_ds
+    # Minimum stocks to consider sc_top10 data valid.
+    # HKEX typically publishes 10 net-buy + 10 net-sell entries; accept >= 5
+    # to guard against partial/early fetches being stored and used as gospel.
+    _MIN_SB = 5
 
     # 1. Try library (already stored from previous run or --reparse)
     sb_map = _build_sb_map(get_top10(today_ds))
+    if sb_map and len(sb_map) < _MIN_SB:
+        log.warning("Southbound top10: library has only %d stocks for %s (< %d) — "
+                    "treating as incomplete, will attempt live fetch", len(sb_map), today_ds, _MIN_SB)
+        sb_map = {}   # discard thin data; live fetch below will overwrite library if better
 
-    # 2. If not in library, try live fetch from HKEX and store immediately
+    # 2. If empty or thin, try live fetch from HKEX and store immediately
     if not sb_map:
         log.info("Southbound top10: not in library for %s — attempting live fetch", today_ds)
         live_rec = sc_fetch_day(trading_day.date() if hasattr(trading_day, 'date') else _date.fromisoformat(today_ds))
-        if live_rec and len(live_rec.get("top10", [])) >= 1:
+        live_count = len(live_rec.get("top10", [])) if live_rec else 0
+        if live_rec and live_count >= _MIN_SB:
             year = trading_day.year
             lib  = sc_load_year(year)
             lib["by_date"][today_ds] = live_rec
@@ -723,7 +762,8 @@ def run_analysis():
             sb_map = _build_sb_map(live_rec.get("top10", []))
             log.info("Southbound top10: live fetch succeeded — %d stocks for %s", len(sb_map), today_ds)
         else:
-            log.info("Southbound top10: live fetch returned no data for %s", today_ds)
+            log.info("Southbound top10: live fetch returned %d stocks for %s (< %d, not saved)",
+                     live_count, today_ds, _MIN_SB)
 
     # 3. Fall back to most recent available day if still empty
     if not sb_map:
