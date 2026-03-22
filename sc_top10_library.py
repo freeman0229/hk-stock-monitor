@@ -22,7 +22,10 @@ Structure:
                        "trades":  990929, "etf": 1661.55},
       "top10": [
         {"code": "09988", "name": "阿里巴巴－Ｗ",
-         "buy":  7696344830, "sell": 5659571687, "total": 13355916517},
+         "sse_buy": 2752383420, "sse_sell": 4389977600, "sse_total": 7142361020,
+         "szse_buy": 1983633040, "szse_sell": 3805295831, "szse_total": 5788928871,
+         "buy": 4736016460, "sell": 8195273431, "total": 12931289891,
+         "rank_sse": 1, "rank_szse": 1},
         ...
       ]
     }
@@ -219,6 +222,10 @@ def parse_js(text: str) -> dict | None:
     """
     Parse the tabData JS variable.
     Returns a dict with sse_summary, szse_summary, top10 combined.
+    Each top10 entry includes full per-exchange fields:
+      sse_buy, sse_sell, sse_total, szse_buy, szse_sell, szse_total,
+      buy (combined), sell (combined), total (combined),
+      rank_sse, rank_szse
     """
     # Strip JS variable assignment to get pure JSON
     m = re.search(r'tabData\s*=\s*(\[.*\])', text, re.DOTALL)
@@ -261,17 +268,52 @@ def parse_js(text: str) -> dict | None:
                 for s in _parse_top10(tbl, is_southbound=True):
                     szse_stocks[s["code"]] = s
 
-    # Combine SSE + SZSE: sum buy/sell/total per code.
-    # Same stock can appear on both lists — just add the numbers together.
+    # Combine SSE + SZSE: preserve per-exchange fields + combined totals.
+    # Same stock can appear on both lists — merge keeping full breakdown.
     merged = {}
-    for s in list(sse_stocks.values()) + list(szse_stocks.values()):
+    for s in sse_stocks.values():
+        code = s["code"]
+        merged[code] = {
+            "code":       code,
+            "name":       s["name"],
+            "sse_buy":    s["buy"],
+            "sse_sell":   s["sell"],
+            "sse_total":  s["total"],
+            "szse_buy":   0,
+            "szse_sell":  0,
+            "szse_total": 0,
+            "buy":        s["buy"],
+            "sell":       s["sell"],
+            "total":      s["total"],
+            "rank_sse":   s["rank"],
+            "rank_szse":  0,
+        }
+    for s in szse_stocks.values():
         code = s["code"]
         if code not in merged:
-            merged[code] = {"code": code, "name": s["name"],
-                            "buy": 0, "sell": 0, "total": 0}
-        merged[code]["buy"]   += s["buy"]
-        merged[code]["sell"]  += s["sell"]
-        merged[code]["total"] += s["total"]
+            merged[code] = {
+                "code":       code,
+                "name":       s["name"],
+                "sse_buy":    0,
+                "sse_sell":   0,
+                "sse_total":  0,
+                "szse_buy":   s["buy"],
+                "szse_sell":  s["sell"],
+                "szse_total": s["total"],
+                "buy":        s["buy"],
+                "sell":       s["sell"],
+                "total":      s["total"],
+                "rank_sse":   0,
+                "rank_szse":  s["rank"],
+            }
+        else:
+            merged[code]["szse_buy"]   = s["buy"]
+            merged[code]["szse_sell"]  = s["sell"]
+            merged[code]["szse_total"] = s["total"]
+            merged[code]["buy"]       += s["buy"]
+            merged[code]["sell"]      += s["sell"]
+            merged[code]["total"]     += s["total"]
+            merged[code]["rank_szse"]  = s["rank"]
 
     # Sanity check
     n_sse, n_szse, n_merged = len(sse_stocks), len(szse_stocks), len(merged)
@@ -453,7 +495,8 @@ def query_date(ds: str):
     print("─" * 72)
     for i, s in enumerate(rec.get("top10", []), 1):
         print(f"{i:<5} {s['code']:<7} {s['name']:<14} "
-              f"{fmt(s['buy']):>12} {fmt(s['sell']):>12} {fmt(s['total']):>12}")
+              f"{fmt(s['buy']):>12} {fmt(s['sell']):>12} {fmt(s['total']):>12} "
+              f"{s.get('rank_sse',0):>4} {s.get('rank_szse',0):>4}")
 
 
 # ── API for main.py ───────────────────────────────────────────────────────────
