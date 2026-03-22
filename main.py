@@ -739,7 +739,7 @@ def run_analysis():
     sb_date_used = today_ds
     # Minimum stocks to consider sc_top10 data valid.
     # HKEX typically publishes 10 net-buy + 10 net-sell; accept >= 5 to guard
-    # against partial/early fetches (e.g. 1 stock) being stored and used.
+    # against partial/early fetches being stored and used.
     _MIN_SB = 5
 
     # 1. Try library (already stored from previous run or --reparse)

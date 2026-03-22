@@ -147,40 +147,72 @@ def _parse_summary(table: dict) -> dict:
     }
 
 def _parse_top10(table: dict, is_southbound: bool) -> list:
-    """Parse style:2 top10Table — per-stock rows."""
-    stocks = []
+    """Parse style:2 top10Table — per-stock rows.
+
+    Defensive against HKEX returning row values as Python ints/floats rather
+    than strings — e.g. stock code 175 instead of "00175". Any unhandled row
+    format is logged and skipped rather than crashing the whole parse, which
+    previously caused subsequent stocks to be silently dropped after the first
+    AttributeError on row[1].strip() when the value was an int.
+    """
+    stocks  = []
+    skipped = 0
     for tr in table.get("tr", []):
         tds = tr.get("td", [])
-        if not tds: continue
+        if not tds:
+            continue
         row = tds[0]
-        if not is_southbound:
-            # Northbound: rank, code, name, total
-            if len(row) < 4: continue
-            rank = _to_i(row[0])
-            if rank <= 0: continue       # skip header/summary rows
-            code_raw = row[1].strip()
-            if not code_raw.isdigit(): continue   # skip invalid/placeholder rows
-            stocks.append({
-                "rank":  rank,
-                "code":  code_raw.zfill(6),
-                "name":  _clean_name(row[2]),
-                "total": _to_i(row[3]),
-            })
-        else:
-            # Southbound: rank, code, name, buy, sell, total
-            if len(row) < 6: continue
-            rank = _to_i(row[0])
-            if rank <= 0: continue       # skip header/summary rows
-            code_raw = row[1].strip()
-            if not code_raw.isdigit(): continue   # skip invalid/placeholder rows (e.g. "-0")
-            stocks.append({
-                "rank":  rank,
-                "code":  code_raw.zfill(5),
-                "name":  _clean_name(row[2]),
-                "buy":   _to_i(row[3]),
-                "sell":  _to_i(row[4]),
-                "total": _to_i(row[5]),
-            })
+        try:
+            if not is_southbound:
+                if len(row) < 4:
+                    continue
+                rank = _to_i(row[0])
+                if rank <= 0:
+                    continue
+                code_raw = str(row[1]).strip()
+                try:
+                    code_int = int(float(code_raw))
+                except (ValueError, TypeError):
+                    skipped += 1
+                    continue
+                if code_int <= 0:
+                    skipped += 1
+                    continue
+                stocks.append({
+                    "rank":  rank,
+                    "code":  str(code_int).zfill(6),
+                    "name":  _clean_name(str(row[2])),
+                    "total": _to_i(row[3]),
+                })
+            else:
+                if len(row) < 6:
+                    continue
+                rank = _to_i(row[0])
+                if rank <= 0:
+                    continue
+                # Code can arrive as int (175) or string ("00175") — normalise both
+                code_raw = str(row[1]).strip()
+                try:
+                    code_int = int(float(code_raw))
+                except (ValueError, TypeError):
+                    skipped += 1
+                    continue
+                if code_int <= 0:
+                    skipped += 1
+                    continue
+                stocks.append({
+                    "rank":  rank,
+                    "code":  str(code_int).zfill(5),
+                    "name":  _clean_name(str(row[2])),
+                    "buy":   _to_i(row[3]),
+                    "sell":  _to_i(row[4]),
+                    "total": _to_i(row[5]),
+                })
+        except Exception as e:
+            skipped += 1
+            log.debug("_parse_top10: skipped row due to %s: %s", type(e).__name__, e)
+    if skipped:
+        log.warning("_parse_top10: skipped %d rows (format issues)", skipped)
     return stocks
 
 def parse_js(text: str) -> dict | None:
@@ -272,9 +304,16 @@ def fetch_day(d: date) -> dict | None:
             raw = f.read()
         parsed = parse_js(raw)
         if parsed is not None:
-            return parsed
-        # Cache file is stale (old JSON format) — delete and re-fetch
-        log.info("  stale cache for %s — re-fetching", d.isoformat())
+            n = len(parsed.get("top10", []))
+            if n >= 10:
+                return parsed
+            # Parsed successfully but got < 10 stocks — cache was written while
+            # HKEX was mid-publish, or a row-format issue caused silent drops.
+            # Delete and re-fetch so we always get a complete result.
+            log.warning("  cache for %s has only %d stocks — deleting and re-fetching",
+                        d.isoformat(), n)
+        else:
+            log.info("  stale cache for %s — re-fetching", d.isoformat())
         os.remove(cp)
 
     url = BASE_URL.format(date=d.strftime("%Y%m%d"))
@@ -353,13 +392,18 @@ def build(update_only: bool = False):
         log.info("── Year %d: %d days ──", year, len(days))
         for i, d in enumerate(days, 1):
             rec = fetch_day(d)
-            if rec:
+            if rec and _is_valid_top10(rec):
                 lib["by_date"][d.isoformat()] = rec
                 top = rec.get("top10", [])
                 names = ", ".join(s["code"] for s in top[:3])
                 log.info("  [%d/%d] %s  %d stocks  top: %s",
                          i, len(days), d.isoformat(), len(top), names)
                 consec_404 = 0
+            elif rec:
+                top = rec.get("top10", [])
+                log.warning("  [%d/%d] %s  only %d stocks — not saved (need >= 10)",
+                            i, len(days), d.isoformat(), len(top))
+                missing.append(d)
             else:
                 missing.append(d)
                 consec_404 += 1

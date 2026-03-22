@@ -242,7 +242,7 @@ def _parse_excel(data: bytes, report_date: date) -> dict | None:
     def _is_hkd_col(c: str) -> bool:
         # SFC Excel files sometimes use Unicode fullwidth dollar U+FF04 (\uff04)
         # instead of ASCII $ — "hk\uff04" never matches "hk$", so col_hkd stays
-        # None and every row is stored with hkd=0.  Normalise before matching.
+        # None and every row is stored with hkd=0. Normalise before matching.
         cn = c.replace("\uff04", "$")
         return any(kw in cn for kw in ("hk$", "hkd", "\u6e2f\u5143", "\u91d1\u984d", "value", "amount"))
 
@@ -338,7 +338,7 @@ def _parse_excel(data: bytes, report_date: date) -> dict | None:
 def reparse(specific_date: date = None):
     """
     Re-parse all (or one) already-cached Excel files from sfc_cache/ and
-    overwrite the stored JSON records.  Use this after fixing column-detection
+    overwrite the stored JSON records. Use this after fixing column-detection
     logic to repair existing files without re-downloading anything.
     Dates with no cache file are skipped silently.
     """
@@ -361,7 +361,7 @@ def reparse(specific_date: date = None):
         save_year(d.year, lib)
         reparsed += 1
         total_hkd = records.get("__total__", {}).get("hkd", 0)
-        log.info("Re-parsed %s → %d stocks  total HKD %.2fbn",
+        log.info("Re-parsed %s -> %d stocks  total HKD %.2fbn",
                  d.isoformat(), len(records) - 1, total_hkd / 1e9)
     log.info("Reparse done: %d reparsed | %d no cache | %d failed",
              reparsed, no_cache, parse_fail)
@@ -494,9 +494,9 @@ if __name__ == "__main__":
                 continue
             with open(p, encoding="utf-8") as f:
                 by_date = json.load(f).get("by_date", {})
-            print(f"\n\u2500\u2500 sfc_{year}.json ({len(by_date)} dates) \u2500\u2500")
+            print(f"\n-- sfc_{year}.json ({len(by_date)} dates) --")
             print(f"{'Date':<12} {'Total HKD':>20} {'Total Sh':>16} {'Stocks':>7}")
-            print("\u2500" * 60)
+            print("-" * 60)
             for ds in sorted(by_date.keys()):
                 t      = by_date[ds].get("__total__", {})
                 stocks = len([k for k in by_date[ds] if k != "__total__"])
