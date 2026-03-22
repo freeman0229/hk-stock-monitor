@@ -779,25 +779,13 @@ def run_analysis():
     log.info("Southbound top10: %d stocks for %s", len(sb_map), sb_date_used)
 
     # 5a. Compute sb_consec and sb_net_prev for each stock in sb_map
-    # Logic: look back through top10 history; count consecutive days with net > 0
-    # (buy > sell). A day the stock is absent = fell off table = streak reset.
-    # Also grab previous day's net for ranking-change comparison.
     def _sb_consec_and_prev(code: str) -> tuple[int, int]:
-        """Returns (consecutive_net_buy_days_including_today, prev_day_net_flow).
-
-        Streak logic:
-        - today always counts as day 1 if it's in sb_map (it is, by definition)
-        - walk back through history; extend streak on net-buy days
-        - skip net-zero days (buy == sell) — consistent with CCASS consec
-        - break on net-sell days
-        """
+        """Returns (consecutive_net_buy_days_including_today, prev_day_net_flow)."""
         history = get_top10_history(code, 30, today_ds)
-        # history is reverse-chrono: [yesterday, day-before, ...]
         prev_net = (history[0]["buy"] - history[0]["sell"]) if history else 0
 
-        today_net = sb_map[code]["sb_net"]   # today is always in sb_map here
+        today_net = sb_map[code]["sb_net"]
         if today_net < 0:
-            # today is net-sell — count how many consecutive sell days
             consec = -1
             for entry in history:
                 net = entry["buy"] - entry["sell"]
@@ -811,16 +799,15 @@ def run_analysis():
         if today_net == 0:
             return 0, prev_net
 
-        # today is net-buy → start streak at 1, extend with prior net-buy days
         consec = 1
         for entry in history:
             net = entry["buy"] - entry["sell"]
             if net > 0:
-                consec += 1       # same direction, extend
+                consec += 1
             elif net == 0:
-                continue          # flat day — skip, don't break streak
+                continue
             else:
-                break             # net-sell — streak ends
+                break
         return consec, prev_net
 
     sb_consec_map  = {}
@@ -833,7 +820,7 @@ def run_analysis():
     # 6. Previous ranks
     prev_ranks = get_prev_ranks(exclude_date=trading_day)
 
-    # 7. Build results
+    # 7. Build results — loop over quotation stocks
     results = []
     for i, row in enumerate(df_quote.itertuples(), 1):
         code         = row.stock_code
@@ -858,15 +845,12 @@ def run_analysis():
         tv_hist30  = get_tv_history(code, 30, today_ds)
         tv_avg30   = sum(tv_hist30) / len(tv_hist30) if tv_hist30 else 0.0
         tv_ratio30 = round(float(row.turnover) / tv_avg30, 2) if tv_avg30 > 0 else 0.0
-        # pct_avg30: 30-day average pct_listed level (not delta)
         pct_hist30 = get_pct_history(code, 30, today_ds)
         pct_avg30_lvl = round(sum(pct_hist30) / len(pct_hist30), 4) if pct_hist30 else 0.0
-        # deviation of today's pct from 30-day avg (percentage points)
         pct_dev30  = round(pct_listed - pct_avg30_lvl, 4) if pct_avg30_lvl > 0 else 0.0
 
         tv_t2_raw      = get_tv(code, t2_key)
         _t2_short      = get_short_history(code, 1, t2_date.strftime("%Y-%m-%d") + "z")
-        # T-2 short ratio: short volume (shares) / traded volume (shares)
         short_sv_t2    = _t2_short[0]["sv"] if _t2_short else 0
         vol_t2_raw     = _tv_recent.get(t2_key, {}).get(code, {})
         vol_t2         = vol_t2_raw.get("vol", 0) if isinstance(vol_t2_raw, dict) else 0
@@ -876,9 +860,7 @@ def run_analysis():
         stock_type       = classify_stock(code, row.name)
         _, ind_zh        = get_industry(code)
 
-        sb           = sb_map.get(code, {})   # must be before classify_insight
-        # Suppress ratio-based signals if history is too thin (< 5 days) to avoid
-        # false positives on new stocks where 1-2 day averages are not meaningful
+        sb           = sb_map.get(code, {})
         has_history  = len(tv_hist30) >= 5 and len(vol_hist30) >= 5
         insight = classify_insight(
             code, stock_type, short_ratio, short_avg5, short_ratio_t2,
@@ -924,6 +906,58 @@ def run_analysis():
             "pct_delta":  round(pct_delta,  4),
             "insight": insight,
         })
+
+    # 7b. Append sc_top10 stocks missing from today's quotation
+    # These are large H-shares/tech stocks (Tencent, Alibaba, Xiaomi etc.) with
+    # SB flow but absent from the HKEX c.htm quotation file, which only covers
+    # a subset of stocks. Without this block their sb_buy/sb_sell data is silently
+    # dropped and the 北水 chart shows only stocks that happen to appear in both.
+    _codes_in_results = {r["code"] for r in results}
+    _nm = load_store(NAME_MAP_FILE)
+    _sb_extras = 0
+    for _code, _sb in sb_map.items():
+        if _code in _codes_in_results:
+            continue
+        _nm_entry  = _nm.get(_code, {})
+        _name_eng  = _nm_entry.get("en", _code)
+        _name_chi  = _nm_entry.get("zh", "") or get_zh_name(_code) or _name_eng
+        _stype     = classify_stock(_code, _name_eng)
+        _, _ind_zh = get_industry(_code)
+        _consec, _prev = _sb_consec_and_prev(_code)
+        # Use real turnover from library if available; fall back to sb_total
+        _tv = get_tv(_code, trading_day.strftime("%Y%m%d"))
+        _turnover = _tv if _tv > 0 else _sb.get("sb_total", 0)
+        _prev_rank = prev_ranks.get(_code)
+        results.append({
+            "rank": len(results) + 1,
+            "rank_change": 0 if _prev_rank is None else _prev_rank - (len(results) + 1),
+            "rank_new": _prev_rank is None,
+            "code": _code, "name": _name_eng, "name_chi": _name_chi,
+            "stock_type": _stype, "industry_zh": _ind_zh,
+            "turnover": _turnover,
+            "sb_buy":      _sb.get("sb_buy",  0),
+            "sb_sell":     _sb.get("sb_sell", 0),
+            "sb_net":      _sb.get("sb_net",  0),
+            "sb_total":    _sb.get("sb_total",0),
+            "sb_net_prev": int(_prev),
+            "sb_consec":   int(_consec),
+            "short_ratio": 0.0, "short_avg5": 0.0, "short_ratio_t2": 0.0,
+            "short_vol": 0, "days_to_cover": 0.0, "vol_ratio": 0.0,
+            "sfc_sh":  sfc_map.get(_code, {}).get("sfc_sh",  0),
+            "sfc_hkd": sfc_map.get(_code, {}).get("sfc_hkd", 0.0),
+            "sfc_pct": sfc_map.get(_code, {}).get("sfc_pct", 0.0),
+            "tv_ratio30": 0.0, "pct_dev30": 0.0,
+            "ccass_trade_date": t2_date.strftime("%Y-%m-%d"),
+            "ccass_delta":      int(ccass_delta_map.get(_code, 0)),
+            "ccass_consec":     int(ccass_consec_map.get(_code, 0)),
+            "ccass_streak_pct": round(ccass_streak_pct_map.get(_code, 0.0), 4),
+            "pct_listed": round(pct_listed_map.get(_code, ccass_pct_map.get(_code, 0.0)), 4),
+            "pct_delta":  round(pct_delta_map.get(_code, 0.0), 4),
+            "insight": None,
+        })
+        _sb_extras += 1
+    if _sb_extras:
+        log.info("Added %d sc_top10 stocks not in quotation", _sb_extras)
 
     # 7. Persist
     output = {"update_time": trading_day.strftime("%Y-%m-%d %H:%M"),
